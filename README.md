@@ -28,6 +28,7 @@ This is a repository of notes and resources for cloud learning, primarily AWS.
 * [Why the serverless revolution has stalled](https://www.infoq.com/articles/serverless-stalled/)
 * [DevOps exercises](https://github.com/bregman-arie/devops-exercises) and [DevOps resources](https://github.com/bregman-arie/devops-resources)
 * [Scool of SRE](https://linkedin.github.io/school-of-sre/)
+* [Katacoda](https://www.katacoda.com/)
 
 ## Books
 
