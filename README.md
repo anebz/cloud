@@ -8,8 +8,9 @@ This is a repository of notes and resources for cloud learning, primarily AWS.
 
 ## AWS Cloud practicioner certificate
 
-1. [AWS certified cloud practitioner](Accreditations/aws_cloud_practitioner.md) [[pdf]](Accreditations/aws_cloud_practitioner.pdf)
-2. [AWS cloud economics accreditation](Accreditations/aws_cloud_economics.md) [[pdf]](Accreditations/aws_cloud_economics.pdf)
+1. [AWS certified cloud practitioner](Accreditations/aws_cloud_practitioner.md): [[pdf]](Accreditations/aws_cloud_practitioner.pdf)
+2. [AWS cloud economics accreditation](Accreditations/aws_cloud_economics.md): [[pdf]](Accreditations/aws_cloud_economics.pdf)
+3. [AWS developer associate](Accreditations/aws_developer_associate.md)
 
 ## Learning
 
@@ -35,14 +36,38 @@ This is a repository of notes and resources for cloud learning, primarily AWS.
 * [Building secure and reliable systems, O'Reilly](https://sre.google/static/pdf/building_secure_and_reliable_systems.pdf)
 * [The site reliability workbook, O'Reilly](https://sre.google/workbook/table-of-contents/): Chapters in web
 * [Site reliability engineering, O'Reilly](https://sre.google/sre-book/table-of-contents/): Chapters in web
+* [The good parts of AWS (pdf)](https://b-ok.cc/book/5458006/1ebc63)
+  * Cloudformation automatic deployments (page 66)
+  * Cloudformation load balancing (page 84)
+  * Cloudformation scaling (page 102)
+  * Cloudformation production (page 113)
+  * Route53 custom domains (page 129)
+  * Migrate endpoint from HTTP to HTTPS (page 139)
+  * Network security: NAT, ASGs (page 159)
 
 ## Cheatsheet
 
-Python & AWS
+Access an EC2 instance from bash
 
+```bash
+chmod 400 mynvkp.pem
+ssh ec2-user@public-ipv4-address -i mynvkp.pem
+```
+
+Configure AWS profile
 ```bash
 aws configure --profile 'newprofile'
 # insert user's data
+
+nano ~/.aws/credentials
+nano ~/.aws/config
+# check that info and profile name has been stored correctly
+
+export AWS_PROFILE=newprofile
+# start using your profile
+
+aws iam get-user
+# should return your Username, UserId, and ARN
 ```
 
 ```python
