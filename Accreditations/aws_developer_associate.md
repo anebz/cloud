@@ -115,7 +115,7 @@ EBSs are attached to an instance, and can't share data between instances.
 
 An user makes a request to the LB at a certain IP address, which then calls the EC2 instance. This instance only sees the LB IP address, not the user's public IP. But it can obtain this by X-Forwarded-For header.
 
-If users lose session or need to re-authenticate often, use ElastiCache Cluster, which provides a shared data storage for sessions that can be accessed from any individual web server. If using an ALB, use sticky sessions which can route requests to the same target in a target group. The clients must support cookies.
+If users lose session or need to re-authenticate often, use ElastiCache Cluster, which provides a shared data storage for sessions that can be accessed from any individual web server. If using an ALB, use sticky sessions which can route requests to the same target in a target group. The clients must support cookies. Stickiness rstricts app elasticity, it's not so scalable.
 
 > Route 53
 
@@ -131,6 +131,8 @@ For internet connectivity to be established in an EC2 instance:
 * The route table in the instance's subnet must have a route to an Internet Gateway
 
 The instance's subnet is always associated with a route table, and can only be associated with one route table at a time.
+
+A VPC doesn't connect directly to an Internet gateway, it connects to a NNat Gateway instead for internet access.
 
 > ACM, certificate manager
 
@@ -195,7 +197,9 @@ Non-relational serverless db stored on SSD, spread across 3 geographically disti
 
 Strongly consistent reads apply onle while using the read operation (Query, Scan and GetItem).
 
-1 RCU = 1 strongly consistent read/s, or 2 eventually consisteny read/s for an item up to 4kb in size. For larger files, additional RCU units must be consumed. Strongly consistent reads consume twice the RCU as eventually consisten reads. A file of 15KB would need 4 reads. And for 100 strongly consistent reads, 100*4 = 400. WCU is 1KB/s.
+1 RCU = 1 strongly consistent read/s, or 2 eventually consisteny read/s for an item up to 4kb in size. For larger files, additional RCU units must be consumed. Strongly consistent reads consume twice the RCU as eventually consisten reads. A file of 15KB would need 4 reads. And for 100 strongly consistent reads, 100*4 = 400. WCU is 1 per 1KB/s.
+
+For transactional read requests, the formula is: 2RCU = 4KB/s. For a file of 5KBs, 4 RCU. And then multiply by items.
 
 For the highest throughput questions, choose eventual consistency, maximum reads capacity * max item size.
 
@@ -236,7 +240,7 @@ Elasticache is used when a db is under a lot of load and the db is very read-hea
 
 Types of Elasticache:
 
-* Memcached: *simple* object caching system to offload a db, supports multithreaded performance using multiple cores. No multi-AZ capability
+* Memcached: *simple* object caching system to offload a db, supports multithreaded performance using multiple cores. No multi-AZ capability, could have downtime
 * Redis: in-memory key-value store that supports sorted sets, lists, backup and restore. Use this if you want high availability, multi-AZ redundancy. AWS treats this more like a RDS, with sorting and ranking datasets in memory. Not highly durable
 
 Strategies for caching:
@@ -363,8 +367,8 @@ Settings:
 * For larger messages than the 256kb limit, you can use S3 to store the messages and Amazon SQS extended client library for Java to manage them, and also the AWS SDK for Java.
 * Dead letter queue: to prevent data loss, they sideline, isolate and alayze the unsucessfully procesed messages. Useful when the lambda function invocation is asynchronous and it fails all retry attempts, in which case the message sends it to the DLQ.
 * Visibility timeout: amount of time that the message is invisible in the SQS after a reader picks up the message. Makes sure that the message isn't read by any other consumer while it's being processed by one. Default is 30s, can be increased if necessary, max 12h. If the job isn't processed in that time, the msg becomse visible again and another reader will process it
-* Short polling: returns a response immediately even if the msg queue is empty --> if queue is empty, lots of empty responses --> additional cost
-* Long polling: periodically poll the queue, response is returned only when a msg arrives or the long poll times out. Can save money. ReceiveMessageWaitTimeSeconds
+* Short polling: returns a response immediately even if the msg queue is empty --> if queue is empty, lots of empty responses --> additional cost. Some messages might not get received, because short polling doesn't return all messages
+* Long polling: periodically poll the queue, response is returned only when a msg arrives or the long poll times out. Can save money. ReceiveMessageWaitTimeSeconds. Use for having the shortest Delay
 
 Security in messages:
 
@@ -386,7 +390,9 @@ Scalable and highly available email service. Pay as you go model, you can send a
 
 ### Kinesis
 
-Family of services to analyze streaming data in real time. Streams are made of shards, each shard is a sequence of 1+ data records and provides a fixed unit of capacity. Default is 5reads/s, max 2MB. 1k writes/s, max is 1MB/s. Kinesis gives you the ability to consume records according to a sequence number applied when data is written to the Kinesis shard.
+Family of services to analyze streaming data in real time. Streams are made of shards, each shard is a sequence of 1+ data records and provides a fixed unit of capacity. Default is 5reads/s, max 2MB. 1k writes/s, max is 1MB/s. Kinesis gives you the ability to consume records according to a sequence number applied when data is written to the Kinesis shard. For X shards, you can have max X instances.
+
+To scale up processing in your app, increase instance size, increase \# instances to max \# open shards, and increase \# shards. The first two steps improve instances while shards run in parallel, the third increases the level of parallelism.
 
 * Streams: stream data/video
   - With enhanced fanout, multiple users can retrieve data from a stream in parallel. Stream consumers can be registered to receive their own 2MB/s pipe of read throughput/shard
@@ -478,6 +484,8 @@ A Publish version is a snapshopt copy of a function code and config in the lates
 * Lambda has a limit to the number of functions that can run simultaneously in a region. Default is 1000 per second per region, the error you get is `TooManyRequestsException`, HTTP status code 429. Avoid recursion!
 * Maximum RAM is 10GB
 
+Make sure the dependencies are included in the deployment package to improve startup time 
+
 > Monitoring and security
 
 With **step functions** you can visualize serverless applications, they automatically trigger and track each step so if something goes wrong you can track what went wrong where. With step functions you can track flows executed by Lambda functions, and you can control multiple Lambda functions. With Step functions state machines you can orchestrate the workflow
@@ -493,6 +501,8 @@ If a function is invoked while a request is still undergoing, another instance i
 You can set up reserved concurrency for the Lambda function so that it throttles if it goes above a certain concurrency limit. This is used to limit the maximum concurrency for a given Lambda function.
 
 You can give a Lambda function from account A permissions to assume a role from account B to access AWS resources. Create an execution role in acc A that gives the function permission. Then create a role in acc B that the function from A assumes to gain access to the cross-acount AWS resource. **Modify the trust policy of the role in B** to allow the execution role of Lambda to assume this role. Finally, update the function code to add the AssumeRole API call.
+
+If Lambda is working with Kinesis data streams, it works synchronously. If it encounters errors, it doesn't proceed execution and retries until the error is resolved or the data expired.
 
 ### X-Ray
 
@@ -571,7 +581,7 @@ The deployment config file, appspec.yml file must be in the root folder of the r
 
 With a CodeDeploy agent in an EC2 instance, the instances can be used in Codedeploy deployments. The agent cleans up log files to conserve disk space.
 
-With Codedeploy deployment groups, in EC2 they're a set of individual instances targeted for delpoyment. 
+With Codedeploy deployment groups, in EC2 they're a set of individual instances targeted for deployment. 
 
 ### ECS
 
@@ -584,6 +594,8 @@ To log in, run `aws ecr get-login`, use the output to login to ECR, and then pul
 * If the container should share storage, use Fargate launch
 
 When you use ECS with a load balancer deployed across multiple AZs, you get a scalable and highly available REST API.
+
+To run X-Ray within ECS, create a Image running the X-Ray daemon, add instrumentation to the app code for X-Ray and configure and use an IAM role for tasks.
 
 ### OpsWorks
 
