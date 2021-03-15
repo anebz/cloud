@@ -1,9 +1,7 @@
 # AWS Certified developer associate
 
-* [Acloudguru course](https://learn.acloud.guru/course/aws-certified-developer-associate/dashboard)
-* [Braincert practice exams (DVA-C01)](https://www.braincert.com/course/lecture/14950-AWS-Certified-Developer-Associate-June-2018-Practice-Exams/18335)
-* [Udemy course](https://www.udemy.com/course/aws-certified-solutions-architect-associate-exam/)
-* [Udemy practice exams](https://www.udemy.com/course/aws-certified-developer-associate-practice-tests-dva-c01)
+* Courses: [Acloudguru](https://learn.acloud.guru/course/aws-certified-developer-associate/dashboard), [Udemy](https://www.udemy.com/course/aws-certified-solutions-architect-associate-exam/)
+* Practice exams: [Braincert (DVA-C01)](https://www.braincert.com/course/lecture/14950-AWS-Certified-Developer-Associate-June-2018-Practice-Exams/18335), [Udemy](https://www.udemy.com/course/aws-certified-developer-associate-practice-tests-dva-c01), [Whizlabs](https://www.whizlabs.com/aws-developer-associate/practice-tests/)
 
 Table of contents
 
@@ -19,6 +17,11 @@ Table of contents
   * [DynamoDB](#dynamodb)
   * [Elasticache](#elasticache)
 * [Security](#security)
+  * [IAM](#iam)
+  * [Cognito](#cognito)
+  * [STS](#sts)
+  * [Encryption](#encryption)
+  * [Systems manager (SSM)](#systems-manager-ssm)
 * [IaaS: CloudFormation](#iaas-cloudformation)
 * [PaaS: Elastic beanstalk](#paas-elastic-beanstalk)
 * [Notifications](#notifications)
@@ -89,33 +92,33 @@ EBSs are attached to an instance, and can't share data between instances.
 ## Monitoring
 
 * Cloudwatch:
-  * host level metrics: CPU, network, disk and status check. For RAM utilization, you have to activate a custom metric. For custom metrics, the minimum granularity you can have is 1min.
+  * host level metrics: CPU, network, disk and status check
+  * Custom metrics: can be used for RAM, \# logged-in users. Min 1min granularity
   * By default, Cloudwatch stores the log data indefinitely, but you can change the retention
   * CloudWatch metrics: they tell the rate at which the function/code is executing, but can't help with debugging the error
   * Cloudwatch logs: Lambda pushes all logs to CW Logs 
   * You can retrieve data from any terminated instance after its termination
-  * Create a high-resolution custom metric to capture \# logged-in users and trigger events accordingly
   * For alarms that should be triggered only if it breaches 2 evaluation periods, set data points to alarm as 2 while creating the alarm
   * CloudWatch integration feature with S3 allows to export log data from CW log groups to S3
+  * *Cloudwatch events*: when the AWS environment changes, AWS resources can be triggered. You can create custom events or events generated periodically.
   * Log group data is always encrypted in CloudWatch logs, with the optional choice of using KMS for this encryption with the customer master key with the CLI command `associate-kms-key`
 * CloudTrail: monitors API calls in the AWS platform. Logs all authenticated API requests to IAM and STS APIs.
 * AWS config records the state of your AWS env and can notify you of changes
-* AWS Budgets it needs approximately 5 weeks of usage data to generate budget forecasts
+* AWS Budgets needs approximately 5 weeks of usage data to generate budget forecasts
 
 ## Networking
 
 > Elastic load balancer
 
-* **ALB**, application load balancer: proxies HTTP and HTTPS requests. adds a few ms to each request, slightly slower than NLB, and don't scale quickly. with host/path based routing, it can handle multiple domains. It doesn't support TCP passthrough
-  - ALB access logs: detailed info about requests sent to the LB. Each log contains the time the request was received, the client's IP address, latencies, request paths, server responses and API connections.
+* **ALB**, application load balancer: proxies HTTP and HTTPS requests. Slightly slower than NLB, and doesn't scale quickly. with host/path based routing, it can handle multiple domains. It doesn't support TCP passthrough
+  - ALB access logs: detailed info about requests sent to the LB. Each log contains the time the request was received, the client's IP address, latencies, request paths, server responses and API connections
   - ALB request tracing: tracks HTTP requests. The LB adds a header with a trace identifier to each request it receives.
   - If the target groups have no registered targets, the error shown is HTTP 503.
-* **NLB**, network load balancer: routes network packets, balance TCP traffic where extreme performance is required, they handle millions of requests per second. Allows TCP passthrough. Cannot handle path based routing. They can capture the user's source IP address and source port without using X-Forwarded-For
+  - THe ALB only sees the LB IP address, not the user's public IP. But it can obtain this by X-Forwarded-For header.
+* **NLB**, network load balancer: routes network packets, balance TCP traffic where extreme performance is required, handle millions of requests per second. Allows TCP passthrough. Cannot handle path based routing. They can capture the user's source IP address and source port without using X-Forwarded-For
 * Classic LB: load balance HTTP/HTTPS apps and user layer7 specific features, and also use strict layer4 load balancing for apps that rely purely on TCP protocol. If it returns 504, it means the gateway has timed out. The app might be failing in the web server or db server.
 
-An user makes a request to the LB at a certain IP address, which then calls the EC2 instance. This instance only sees the LB IP address, not the user's public IP. But it can obtain this by X-Forwarded-For header.
-
-If users lose session or need to re-authenticate often, use ElastiCache Cluster, which provides a shared data storage for sessions that can be accessed from any individual web server. If using an ALB, use sticky sessions which can route requests to the same target in a target group. The clients must support cookies. Stickiness rstricts app elasticity, it's not so scalable.
+If users lose session or need to re-authenticate often, use ElastiCache Cluster, which provides a shared data storage for sessions that can be accessed from any individual web server. If using an ALB, use sticky sessions which can route requests to the same target in a target group. The clients must support cookies. Stickiness restricts app elasticity, it's not so scalable.
 
 > Route 53
 
@@ -150,9 +153,16 @@ S3 has a pricing for every TB for month. With many requests, request pricing get
 
 To replicate a bucket in another region, first enable S3 bucket versioning, then enable cross-region replication by enabling cross-origin resource sharing (CORS) on bucket2: a bucket1 from region A can access files from bucket2. For that, bucket1 needs permission to replicate objects from bucket2.
 
+About S3 versioning, by creating new versions for each change the previous changes can be recovered. Overwriting, deleting files create a new version. Previous, unversioned files get the 'null' version. Versioning can be enabled for all objects in a bucket.
+
 With CORS, you can build rich client-side web apps with S3 and selectively allow cross-origin access to S3 resources. To do this, create a CROS configuration with an XML doc with rules that identify the origins that you allow to access the bucket, the operations (HTTP methods) that will support for each origin.
 
-Encryption, in transit it's called SSL/TLS, at rest:
+* S3 Select enables SQL expressions to select a subset of the data
+* S3 inventory can be used to audit and report on the replication & encryption status of the objects
+* S3 analytics: analyze storage acess patterns, to change storage class for example
+* S3 access logs: records for the requests that are made to a bucket. Useful for security and access auditing
+
+> Encryption, **in transit it's called SSL/TLS**, at rest it can be:
 
 * Server side encryption, protecting data at rest. Can be enforced by using a bucket policy that denies S3 PUT requests that don't include the SSE parameter in the request header. Useful to audit trail of who has used the keys.
   * S3 managed keys (SSE-S3): each object is encrypted with a unique key, and S3 encrypts the key itself with a master key that it regularly rotates. `s3:x-amz-server-side-encryption": "AES256`
@@ -215,6 +225,8 @@ RCU and WCUs are specific to one table.
 
 A local secondary index can only be created at the time of table creation, but a global secondary index can be created at at any time. Local indexes are immediately consistent but once you create them, all records sharing the same partition key need to fit in 10GB. Global indexes don't constrain your table size in any way, but reading from them is eventually consistent.
 
+LSIs and GSIs can coexist. LSIs use the RCU and WCU of the main table, which can't be changed. GSIs are stored in their own partition space away from the base table, and scale separately from the base table.
+
 Query results are always sorted in ascending order by the sort key if there is one, and query operation is generally more efficient than a scan. If querying in an attribute *not* part of partition/sort key, querying that is the same as scanning. Parallel scans while limiting the rate minimize the execution time of a table lookup.
 
 The number of tables per account and number of provisioned throughput units per account can be changed by raising a request. A conditional action is an action only to be taken if certain attributes of the item still have the values you expect.
@@ -223,20 +235,21 @@ When read and write are distributed unevenly, a "hot" partition can receive a hi
 
 > Caching
 
-DynamoDB accelerator (DAX) is a fully managed, clustered in-memory cache for DynamoDB. It improves response times for eventually consistent reads only. You point the API calls th the DAX cluster instead of your table. It's not suitable for apps requiring strongly consistent reads, or write intensive apps, or apps that don't read much, or apps that don't require microsecond response time.
+DynamoDB accelerator (DAX) is a fully managed, clustered in-memory cache for DynamoDB. It improves response times for eventually consistent reads only. You point the API calls th the DAX cluster instead of your table. DAX cluster pass all requests to DynamoDB and doesn't cache for these requests. It's not suitable for apps requiring strongly consistent reads, or write intensive apps or apps that don't require microsecond response time.
 
 * **DynamoDB TTL** is a time to leave attribute to *remove* irrelevant or old data which sets the time in Unix/Posix epoch times, the \#seconds since 1970/1/1.
 * **DynamoDB streams** is a time-ordered sequence of item level modifications in the DynamoDB tables, can be used as an event source for Lambda to take action based on events in the table. You can use it when a record is inserted to table2 whenever items are updated in table1
+* **DynamoDB transactions**: to do coordinated, all-or-nothing changes to multiple items within and across tables.
 
 For backup, DynamoDB has 2 built-in backup methods: on-demand and point-in-time recovery. Both write to S3, but you can't access the s3 buckets for a download.
 
-For high latency issues, use eventually consistent reads instead of strongly consistent reads whenever possible, and use global tables if the app is accessed by globally distributed users.
+For high latency issues, use eventually consistent reads instead of strongly consistent reads whenever possible, and use global tables if the app is accessed by globally distributed users. Also use exponential backoff in the requests.
 
 ### Elasticache
 
 Web service that makes it easy to deploy, operate and scale an in-memory cache in tle cloud. It can be used to improve latency and throughput for many read-heavy apps or *compute-intensive* workloads. Elasticache can also be used to store session states.
 
-Elasticache is used when a db is under a lot of load and the db is very read-heavy and not prone to frequent changing. If the db is running many OLAP transactions, use Redshift. Redshift is not suitable for workloads that need to capture data.
+Elasticache is used when a db is under a lot of load and the db is very read-heavy and not prone to frequent changing. If the db is running many OLAP transactions, use Redshift. Redshift is not suitable for workloads that need to capture data, but it supports join operations.
 
 Types of Elasticache:
 
@@ -245,8 +258,10 @@ Types of Elasticache:
 
 Strategies for caching:
 
-* Lazy loading: loads data into the cache only when necessary. only the requested data is cached. It can have cache miss penalty, and the data can get stale. If the data in the db changes, the cache doesn't automatically get updated
-* Write-through: adds/updates data to the cache whenever data is written to the db. Data in the cache is never stale, but write penalty: every write involves a write to the cache and resources are wasted if the data is never read. Elasticache node failure means that data is missing until added or updated in the database
+* **Lazy loading**: loads data into the cache only when necessary. only the requested data is cached. Good option when there's not much space. It can have cache miss penalty, and the data can get stale. If the data in the db changes, the cache doesn't automatically get updated
+* **Write through**: adds/updates data to the cache whenever data is written to the db. Data in the cache is never stale, but write penalty: every write involves a write to the cache and resources are wasted if the data is never read. Elasticache node failure means that data is missing until added or updated in the database
+
+For backend caching, similar to write-through: write to backend, and then invalidate the cache. Then the caching engine fetches the latest value from the backend, so the backend and cache are in sync always.
 
 ## Security
 
@@ -254,7 +269,7 @@ For creating CloudFront key pairs, root access is needed. Non-root access for EC
 
 To avoid data leaks and identify security weaknesses, try SQL injections, penetration tests (with AWS approval) and hardening tests. Code checks only check performance issues.
 
-> IAM
+### IAM
 
 With policies, all requests are denied by default. An explicit allow overrides a default deny. An explicit deny overrides an explicit allow. Types of policies:
 
@@ -274,7 +289,7 @@ With IAM variables, you can use policy variables and create a single policy that
 
 For custom policies, you can test out the permissions by getting the context keys, and use the `aws iam simulate-custom-policy` command.
 
-> Cognito
+### Cognito
 
 Web identity federation (WIF) allows users to authenticate with a WI provider (WIP): Google, Facebook, Amazon. The user authenticates first with the Web ID provider and receives an authentication token, which is exchanged for tmp AWS credentials allowing them to assume an IAM role. Cognito works with MFA authentication.
 
@@ -283,17 +298,19 @@ Web identity federation (WIF) allows users to authenticate with a WI provider (W
 * Cognito **Sync** allows cross device data sync without requiring your own backend
 * Cognito **streams** allows control and insight into the data stored in Cognito. You can configure a kinesis stream to receive events as data is updated and synchronized. Cognito can push each dataset change to a Kinesis stream in real-time 
 
-STS is a web service enabling you to request temporary, limited-privilege credentials for IAM users or for users you authenticate. But it's not supported by API gateway.
+### STS
+
+STS is a web service enabling you to request temporary, limited-privilege credentials for IAM users or for users you authenticate. But it's **not supported by API gateway**. STS credentials expire after 1h.
 
 STS AssumeRoleWithWebIdentity is part of the security token service, it allows users who have authenticated with a web identity provider to access AWS resources. If successful, STS returns temporary credentials. AssumedRoleUser ARN and assumedRoleID are used to programatically reference the temporary credentials, not an IAM role or user.
 
-> Encryption
+### Encryption
 
 * KMS, key management service, for creating and storing encryption keys. useful for sensitive information. KMS encryption keys are regional. Up to 4KB can be encrypted. For bigger keys, envelope encryption.
-* CMK, customer master key, can encrypt/decrypt the data key, and this data key is used to encrypt/decrypt your data. This is called envelope encryption, and the reason to use it is that this way only the data key goes over the network, not the data.
+* CMK, customer master key, can encrypt/decrypt the data key, and this data key is used to encrypt/decrypt your data. This is called envelope encryption, and the reason to use it is that this way only the data key goes over the network, not the data. Use GenerateDataKey to get the data key to encrypt the data
 * Envelope encryption: first the data is encrypted using a plaintext Data key. This key is then further encrypted with a plaintext Master key.
 
-> Systems manager (SSM)
+### Systems manager (SSM)
 
 * SSM Parameter Store is storage for config data management and secrets management, to manage configs outside of EC2, or EBS They can be load dynamically into the app at runtime
 * SSM parameter store secure string: for credentials, secrets, config variables, confidential or sensitive information
@@ -307,7 +324,7 @@ AWS resources defined in a YAML script. CF should be used for VP configs, securi
   * Can reference a nested stack, which must be saved in S3.
   * `!GetApp` returns the value of an attribute from a resource in the template
 * **Conditions** section includes conditions that control whether certain resource properties are assigned a value during stack creation or update
-* **Parameters** to pass values to the template at runtime. Does not allow conditions
+* **Parameters** to *pass values* to the template at runtime. Does not allow conditions.
 * **Mappings** of keys and values that can specify conditional parameter values
   * `!FindinMap` returns the value of a key of a variable in the section. Use this for the map of the base AMIs.
 * **Outputs** declares output values that you can import into other stacks, return in response or view on CF console. Use Export field for this
@@ -320,6 +337,12 @@ If Stack B and Stack C depend on Stack A, stack A must be deleted last. All impo
 
 With a cross-stack reference, you can export resources from one AWS CF stack to another. With a cross-stack reference, owners of the web app stacks don't need to create or maintain networking rules or assets. For this, use the Exports output field to flag the value of VPC from the network stack.
 
+> Lambda & CF
+
+To declare a Lambda function in CF, either upload the code as a zip to S3 and refer the object in AWS::Lambda::Function, or if the code is small and has no third-party dependencies, write the code inline in CF in the AWS::Lambda::Function block.
+
+Lambda & X-Ray, no need to install daemon in Lambda. Only the IAM role assigned to Lambda should have access to X-Ray.
+
 CLI commands: 
 
 * cloudformation package: package the local artifacts that the CF template references. Uploads the local artifacts, like source code to Lambda
@@ -327,23 +350,35 @@ CLI commands:
 
 ## PaaS: Elastic beanstalk
 
-Deploy and scale web apps. Beanstalk takes care of provisioninig load balancers, security groups, launching EC2 instances, autoscaling groups, creating S3 buckets and dbs. It integrates with CloudWatch and CloudTrail and includes its own health dashboard.
+Deploy and scale web apps, without provisioning underlying servers, LBs, security groups etc.. If the on-premise application doesn't use Docker and can't seem to find a relevant environment in Beanstalk, use Packer to create a custom platform.
 
-For deployment updates, it deploys to all hosts concurrently, in batches, and deploys the new version to a fresh group of instances before deleting the old instances. Deployments are immutable, the new versions use another instances, they don't touch the ones until now.
+> Deployment
 
-Traffic splitting / canary testing: installs the new version on a new set of instances like an immutable deployment. Forwards a percentage of incoming client traffic to the new app version for a specified evaluation period. If the new instances are healthy, all traffic is sent to the new version. Rollback requires another rolling update.
+* All at once: quickest, reduced availability
+* Rolling: longer, no downtime and minimizes reduced availability. the app is deployed to your environment one batch of instances at a time. Most bandwidth is retained throughout the deployment.
+* Rolling with additional batch: even longer, no downtime, no reduced availability, bandwidth maintained.
+* Immutable: longest, no downtime, no reduced availability, new version is deployed to new instances, quick and safe rollback, automatic ASG launched to serve traffic to new version alongside the old version until the new instances pass health checks. 
+* Traffic splitting / canary testing: useful if you want to test the health of your new application version using a portion of incoming traffic, while keeping the rest of the traffic served by the old application version.
 
-If Beanstalk takes too long, use pre-baked AMIs to preload and prepackage dependencies instead of having to configure it at launch.
+> Launch
 
-Elasticache should be defined in .ebextensions/, but RDS database should be referenced externally and reference through env variables. All the EBS config files should be under this folder with the .config extension. For cron jobs, include `cron.yaml`.
+* If launch takes too long: preload and prepackage dependencies in pre-baked AMIs instead of having to configure it at launch
+* If Beanstalk performs tasks that take a long time: offload the tasks to a dedicated worker environment
 
-By enabling log file rotation to S3 within the ELB configuration, developers can access the logs without logging into the app servers.
+> Config
 
-If Beanstalk performs tasks that take a long time, they can be offloaded to a dedicated worker environment.
+* `.ebextensions/`, environment customization with configuration files
+  * Files must be YAML/JSON and have `.config` extension
+  * Define Load Balancers, Elasticache
+  * Docker containers are supported
+  * If the env must include custom software, create YAML with the required package names
+  * For RDS, reference externally and load with env variables
 
-To export a Beanstalk configuration to another account, create a saved configuration from acc1, download it to local. In acc2, upload it to S3 bucket and from Beanstalk console create the app from 'saved configurations'.
+Other configurations
 
-If the on-premise application doesn't use Docker and can't seem to find a relevant environment in Beanstalk, use Packer to create a custom platform.
+* For cron jobs, set up a worker environment and include `cron.yaml`
+* Access logs without logging into the app servers by enabling log file rotation to S3 within the ELB configuration
+* To export a Beanstalk configuration to another account, create a saved configuration from acc1, download it to local. In acc2, upload it to S3 bucket and from Beanstalk console create the app from 'saved configurations'.
 
 ## Notifications
 
@@ -353,13 +388,15 @@ If the on-premise application doesn't use Docker and can't seem to find a releva
 * No strict ordering and duplicates
   * FIFO queues: strict ordering, exactly one-time processing and no duplicates, but then you have a limit of 300 messages/second
   * To ensure that messages are delivered in order, use FIFO queues + use sequence info in the messages with Standard queues
+  * Each sender's messages must be processed in order, by configuring each sender with a unique MessageGroupId, this is a flag that specifies that a message belongs to a specific message group. Messages that belong to a group are always processed one by one, in a strict order relative to the message group.
 * When retrieving messages from a queue, you specify the max \# messages (up to 10) that you want to receive
 * For orders with different priorities, use 2 SQS queues
 * Default standard queues have unlimited transactions and guarantee that a message is delivered at least once and provide best-effort ordering, which means that occasionally there might be duplicate messages or out of order
 * Automatically scales based on demand. No message limits for storing in SQS, but 'in-flight messages' (received from a queue by a consumer, but not yet deleted from queue) max 120k inflight messages
 * Retention period default is 4 days, but you can increase the queue message retention up to 14 days with Set QueueAttributes action
 * SQS doesn't automatically delete messages, the app has to issue the command
-* Each sender's messages must be processed in order, by configuring each sender with a unique MessageGroupId, this is a flag that specifies that a message belongs to a specific message group. Messages that belong to a group are always processed one by one, in a strict order relative to the message group.
+
+To reduce costs, use long polling + group the SQS API operations in batches.
 
 Settings:
 
@@ -396,7 +433,7 @@ To scale up processing in your app, increase instance size, increase \# instance
 
 * Streams: stream data/video
   - With enhanced fanout, multiple users can retrieve data from a stream in parallel. Stream consumers can be registered to receive their own 2MB/s pipe of read throughput/shard
-* Firehose: capture, transform, load streams into AWS data stores, when streamling directly into S3 for example. no analysis
+* Firehose: capture, transform, load streams into AWS data stores, when streamling directly into S3 for example. no analysis. To encrypt data, enable encryption on firehose and ensure that kinesis streams are used to transfer data from the producers
 * Data analytics: analyze, query and transform streamed data in real-time using standard SQL and save in an AWS data store
 
 If your data rate increases, you can increase or decrease the number of shards allocated to your stream. The Kinesis client library ensures that for every shard there is a record processor. You should ensure that the \#instances >! \#shards. No need to use multiple instances to handle the processing load of one shard. One worker can process multiple shards. Resharding, increasing the number of shards, doesn't mean you need more instances.
@@ -422,7 +459,9 @@ Whenever you upload a new version of your app to EBS, it creates an app version.
 
 ## Serverless
 
-SAM is the serverless application model, to define and provision serverless apps using CloudFormation. For launching a templatized serverless app, use CF package then CF deploy. 
+SAM is the serverless application model, to define and provision serverless apps using CloudFormation. To deploy using SAM CLI, develop+test the app locally, use `sam deploy`. This zips the app, uploads them to S3 and deploys the app to AWS.
+
+For launching a templatized serverless app, use CF package then CF deploy.
 
 * AWS::Serverless::Application: to embed nested apps from S3 buckets
 * AWS::Serverless::API: to create API gateway resources and methods that can be invoked through HTTPS endpoints
@@ -484,7 +523,7 @@ A Publish version is a snapshopt copy of a function code and config in the lates
 * Lambda has a limit to the number of functions that can run simultaneously in a region. Default is 1000 per second per region, the error you get is `TooManyRequestsException`, HTTP status code 429. Avoid recursion!
 * Maximum RAM is 10GB
 
-Make sure the dependencies are included in the deployment package to improve startup time 
+Make sure the dependencies are included in the deployment package, along with the code, to improve startup time 
 
 > Monitoring and security
 
@@ -508,7 +547,9 @@ If Lambda is working with Kinesis data streams, it works synchronously. If it en
 
 Prerequisites: install X-Ray daemon in the instance, create IAM role, give X-Ray permission: xray:PutTraceSegments and xray:PutTelemetryRecords and instrument the app with daemon and SDK.
 
-Analyzes and debugs **distributed** apps' performance, identify and troubleshoot performance issues and errors. Provides an end-to-end view of requests as they travel through the app, and shows a map of the app's underlying components. X-Ray can be used to collect data **across AWS** accounts.
+Analyzes and debugs **distributed** apps' performance, identify and troubleshoot performance issues and errors. Provides an end-to-end view of requests as they travel through the app, and shows a map of the app's underlying components. 
+
+X-Ray can be used to collect data **across AWS** accounts. For that, create a role in the target unified account and allow roles in each sub-acc to assume the role. Configure the X-Ray daemon to use an IAM instance role.
 
 X-Ray sampling allows to control the amount of data to be recorded, and modify sampling behavior on the fly without modifying or redeploying your code.
 
@@ -517,6 +558,8 @@ X-Ray integrates with ELBs, Lambda and API gateway. Provides:
 * Interceptors to add to the code to trace incoming HTTP requests
 * Client handlers to instrument AWS SDK clients that the app uses to call other AWS services
 * An HTTP client to instrument calls to other internal and external HTTP web services
+
+To ensure that X-Ray daemon is correctly discovered in ECS, use the SDK AWS_XRAY_DAEMON_ADDRESS env variable.
 
 ## Developer tools
 
@@ -562,7 +605,7 @@ If the deployment fails and is getting rolled back, CodeDeploy first deploys to 
   * **Bandwidth** and availability maintained
   * Takes longer than the Rolling deployment
   * If failed deployment, similar to rolling
-* blue/green: Autoscaling group is used for this
+* blue/green: own autoscaling group is used for this, weighted routing policies on Route 53 can be used too.
   * new env created from scratch, another LB. The switch is performed at DNS level routing the traffic from the OLD to the NEW when the new environment is ready and healthy. Instant complete switch from old to new version
   * slowest deployment method
   * new instances provisioned, new release is installed on the new instance
@@ -581,7 +624,9 @@ The deployment config file, appspec.yml file must be in the root folder of the r
 
 With a CodeDeploy agent in an EC2 instance, the instances can be used in Codedeploy deployments. The agent cleans up log files to conserve disk space.
 
-With Codedeploy deployment groups, in EC2 they're a set of individual instances targeted for deployment. 
+With Codedeploy deployment groups, in EC2 they're a set of individual instances targeted for deployment.
+
+For rollback, if the prev version's files are unreachable, they have to be manually added to the instance, or a new app revision must be created.
 
 ### ECS
 
@@ -595,7 +640,7 @@ To log in, run `aws ecr get-login`, use the output to login to ECR, and then pul
 
 When you use ECS with a load balancer deployed across multiple AZs, you get a scalable and highly available REST API.
 
-To run X-Ray within ECS, create a Image running the X-Ray daemon, add instrumentation to the app code for X-Ray and configure and use an IAM role for tasks.
+To run X-Ray within ECS, create an image running the X-Ray daemon (so an additional image), add instrumentation to the app code for X-Ray and configure and use an IAM role for tasks.
 
 ### OpsWorks
 
