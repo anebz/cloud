@@ -43,12 +43,14 @@ Table of contents
 
 ### EC2
 
+For accessing an EC2 instance, use key pars.
+
 * By default, user data runs only during the boot cycle when the instance is first launched. And by default, scripts entered as user data have root user privileges for executing, so they don't need sudo command
 * Burstable performance instances, such as T3, T3a and T2, are designed to provide a baseline level of CPU performance with the ability to burst to a higher level when required by the workload. If your AWS account is less than 12 months old, you can use a t2.micro instance for free within certain usage limits
 
 For reserving instances, you can reserve it for an AZ (zonal RI) or region (regional AI). Zonal RIs provide a capacity reservation but regional don't.
 
-EC2 only allows in-place or blue/green deployment.
+EC2 only allows in-place or blue/green deployment. A placement group enables instances to interact with each other via high bandwidth, low latency connection.
 
 For detailed monitoring, install Cloudwatch agent on the machine and then configure it to send the server's logs to a central location in Cloudwatch.
 
@@ -64,14 +66,14 @@ aws ec2 monitor-instances --instance-ids i-1234567890abcdef0
 > Autoscaling
 
 * When creating from the console, only basic monitoring by default. When creating through CLI/SDK, detailed monitoring by default.
-* If one instance exceeds capacity, ASG creates a new one. If it's unhealthy, the AS group will terminate it and create a new one
+* If one instance exceeds capacity, ASG creates a new one. If it's unhealthy, the AS group will terminate it first, and create a new one after
 * ASGs attempt to distribute instances evenly between the AZs that are enabled for the ASG
 * ASG can contain EC2 instances in multiple AZs within the same region, and cannot span multiple regions
 * By querying the instance metadata, it's possible to get the private IP address of the instance.
 
 ### EBS
 
-Highly available (automatically replicated within a single AZ but AZ locked) and scalable storage volume that can be attached to the EC2 instance. An EBS volume can be created from a snapshot. If this snapshot is encrypted, the volume will be encrypted. Upon launch of an instance, at least one EBS volume is attached to it. Types:
+Highly available (automatically replicated within a single AZ but AZ locked) and scalable storage volume that can be attached to the EC2 instance. Upon launch of an instance, at least one EBS volume is attached to it. Types:
 
 * **gp2**: general purpose SSD, boot disks and general applications. the only option that can be a boot volume. up to 16k IOPS per volume
 * **io1**: provisioned IOPS SSD: higher IOPS, many read/writes per second. For large dbs, latency-sensitive workloads. highest performance option, most expensive. **io2**, new generation, more IOPS per GiB.
@@ -82,10 +84,14 @@ The maximum ratio of provisioned IOPS to the requested volume size (in GB) is 50
 
 EBSs are attached to an instance, and can't share data between instances.
 
+Snapshots are incremental, can be used to launch a new instance, but they span the region, which means they aren't in the same AZ as the volume.
+
+To encrypt a volume: snapshot the current volume, create an encrypted snapshot, restore the volume from the encrypted snapshot, mount it.
+
 > Encrpytion
 
 * EBS volumes support in-flight encryption and also at rest encryption using KMS
-* A volume restored from an encrypted snapshot, or a copy of an encrypted snapshot, is always encrypted
+* An encrypted EBS volume always creates an encrypted snapshot, which always creates an encrypted EBS volume
 * Encryption by default is a region-specific setting. If enabled for a region, it can't be disabled for individual volumes or snapshots in that region
 * If an encoded authorization message is received, use STS decode-authorization-message
 
@@ -110,17 +116,19 @@ EBSs are attached to an instance, and can't share data between instances.
 
 4xx errors are due to missing required parameters in a request, or exceeding a DB table's provisioned throughput. 5xx errors are due to unavailable services, or network issues.
 
-> Elastic load balancer
+> Elastic load balancer, ELB
 
 * **ALB**, application load balancer: proxies HTTP and HTTPS requests. Slightly slower than NLB, and doesn't scale quickly. with host/path based routing, it can handle multiple domains. It doesn't support TCP passthrough
   - ALB access logs: detailed info about requests sent to the LB. Each log contains the time the request was received, the client's IP address, latencies, request paths, server responses and API connections
   - ALB request tracing: tracks HTTP requests. The LB adds a header with a trace identifier to each request it receives.
   - If the target groups have no registered targets, the error shown is HTTP 503.
   - THe ALB only sees the LB IP address, not the user's public IP. But it can obtain this by X-Forwarded-For header.
+  - Sticky sessions route requests to the same target in a target group. The clients must support cookies. Stickiness restricts app elasticity, it's not so scalable.
+  - If the app has no cookie management, let the LB generate a cookie for a specified duration
 * **NLB**, network load balancer: routes network packets, balance TCP traffic where extreme performance is required, handle millions of requests per second. Allows TCP passthrough. Cannot handle path based routing. They can capture the user's source IP address and source port without using X-Forwarded-For
 * Classic LB: load balance HTTP/HTTPS apps and user layer7 specific features, and also use strict layer4 load balancing for apps that rely purely on TCP protocol. If it returns 504, it means the gateway has timed out. The app might be failing in the web server or db server.
 
-If users lose session or need to re-authenticate often, use ElastiCache Cluster, which provides a shared data storage for sessions that can be accessed from any individual web server. If using an ALB, use sticky sessions which can route requests to the same target in a target group. The clients must support cookies. Stickiness restricts app elasticity, it's not so scalable.
+If users lose session or need to re-authenticate often, use ElastiCache Cluster, which provides a shared data storage for sessions that can be accessed from any individual web server.
 
 > Route 53
 
@@ -146,7 +154,9 @@ Used to configure SSL/TLS certificates on an ALB; use IAM when the region is not
 
 ### S3
 
-Serverless storage service, best suited for objects and BLOB data. Avoid using reduced redundancy and don't use S3 for static web hosting, since HTTPS is not allowed. S3 has a pricing for every TB for month. For log files, if objects change frequently it needs update buffering.
+Serverless storage service, best suited for objects and BLOB data. S3 has a pricing for every TB for month. For log files, if objects change frequently it needs update buffering. 
+
+Avoid using reduced redundancy and don't use S3 for static web hosting, since HTTPS is not allowed. When creating a static website hosting, you can configure index document, error document and conditional redirection on object name. It's not possible to configure conditional error on object name.
 
 When using CloudFormation to delete buckets, make sure that all objects are deleted before deleting the bucket.
 
@@ -156,6 +166,10 @@ A single PUT can upload objects up to 5GB. To upload larger files, use multi-par
 
 * When writing a new object to S3 and immediately listing the keys within a bucket, the object might not appear in the list until the change is fully propagated
 * When deleting an object and immediately trying to read it or list it, S3 might return the deleted data until the change fully propagated
+
+When a large number of objects are uploaded, to improve performance, add a hash prefix to the folder. Introducing randomness as key prefix improves performance. If all files are in the same folder, add the key prefix to the object.
+
+Whenever an object is uploaded, a HTTP 200 result code and MD5 checksum, taken together, indicate that the operation was successful.
 
 > Downloading
 
@@ -183,6 +197,8 @@ Encryption **in transit is called SSL/TLS**, at rest it can be:
   * AWS KMS managed keys (SSE-KMS), you can set up an envelope key which encrypts the key. You can use AWS-managed CMK or customer-managed CMK. `s3:x-amz-server-side-encryption": "aws-kms`
   * Server side encryption with customer provided keys (SSE-C). Then the customer needs to send the keys and encryption algorithm with each API call. For this situation, if the request is made over HTTP, S3 rejects it.
 * Client side encryption: used for encryption **in transit**
+
+S3 uses a special log delivery account, Log Delivery group, to write access logs. This group will need group write permissions on the target bucket by adding a grant entry in the bucket's ACL.
 
 > Cross-region
 
@@ -240,6 +256,8 @@ All DynamoDB tables are encrypted at rest with an AWS owned key by default. Acce
 
 > Table settings
 
+An item can have more than one attributes. The primary key can be single key (partition key) or composite key (partition key + sort key). The partition key and sort key can be different from the base table.
+
 A local secondary index can only be created at the time of table creation, but a global secondary index can be created at at any time. Local indexes are immediately consistent but once you create them, all records sharing the same partition key need to fit in 10GB. Global indexes don't constrain your table size in any way, but reading from them is eventually consistent.
 
 LSIs and GSIs can coexist. LSIs use the RCU and WCU of the main table, which can't be changed. GSIs are stored in their own partition space away from the base table, and scale separately from the base table.
@@ -268,6 +286,7 @@ Types of Elasticache:
 
 * Memcached: *simple* object caching system to offload a db, supports multithreaded performance using multiple cores. No multi-AZ capability, could have downtime
 * Redis: in-memory key-value store that supports sorted sets, lists, backup and restore. Use this if you want high availability, multi-AZ redundancy. AWS treats this more like a RDS, with sorting and ranking datasets in memory. Not highly durable
+* Redis cluster provide high availability and durability
 
 Strategies for caching:
 
@@ -290,9 +309,11 @@ With policies, all requests are denied by default. An explicit allow overrides a
 - Customer managed policy. It can be assigned to multiple users, groups or roles in your account
 - Inline policy: managed by the customer and embedded in a single user, group or role. useful if you want to maintain a strict one-to-one relationship between a policy and the identity that it's applied to. The policy will be deleted if you delete the user, group or role it is associated with
 
+Trust policies is a resource-based policy, it defines which entities can assume the role. An IAM role needs both a trust policy and an identity-based policy attached to it.
+
 By setting up cross-account access, you can delegate access to resources that are in different AWS accounts, and you don't need to create individual IAM users in each account.
 
-Users need to have IAM activated if they want access to Billing and Cost management console. 
+Users need to have IAM activated if they want access to Billing and Cost management console. When using this console, there's a paying account and a linked account.
 
 With IAM variables, you can use policy variables and create a single policy that applies to multiple users. You can make a policy that gives each user in the group full programmatic access to a user-specific object (their own "home directory") in S3.
 
@@ -352,6 +373,8 @@ If Stack B and Stack C depend on Stack A, stack A must be deleted last. All impo
 
 To declare a Lambda function in CF, either upload the code as a zip to S3 and refer the object in AWS::Lambda::Function, or if the code is small and has no third-party dependencies, write the code inline in CF in the AWS::Lambda::Function block.
 
+ CF change sets feature: helps check how changes to a CF template affect AWS resources before implementing the updated
+
 CLI commands:
 
 * `cloudformation package`: package the local artifacts that the CF template references. Uploads the local artifacts, like source code to Lambda
@@ -396,7 +419,7 @@ Whenever a new version is uploaded to Beanstalk, it creates an app version. If t
 
 ### SQS
 
-Highly-durable pull-based queue. It has no strict ordering and might contain duplicates. It automatically scales based on demand but doesn't automatically delete messages, the app has to issue the command.
+Highly-durable pull-based queue, useful for persist in-flight transactions. It has no strict ordering and might contain duplicates. It automatically scales based on demand but doesn't automatically delete messages, the app has to issue the command.
 
 * Message size limit is 256kb. For larger messages, store the messages in S3 and use Amazon SQS extended client library for Java to manage them, and also the AWS SDK for Java.
 * No message limits for storing in SQS, but 'in-flight messages' (received from a queue by a consumer, but not yet deleted from queue) max 120k inflight messages
@@ -429,7 +452,7 @@ If there are multiple senders, each sender's messages must be processed in order
 SNS
 
 * Push-based asynchronous simple notification service with durable storage to send notifications from the cloud
-* It can deliver push notifications, SMS and emails to any HTTP endpoint, and it can trigger a Lambda function. Can't receive anything
+* It can deliver push notifications, SMS and emails to any HTTP endpoint, and it can trigger a Lambda function. SES is not an endpoint. Can't receive anything
 * Pub-sub model (publish and subscribe). Apps can push msgs to a topic, and subscribers receive these from the topic. Consumers must subscribe to a topic to receive the notifications
 * Useful when sending a message and its metadata at the same time
 * SNS can be used in conjunction with SQS to fan a single message out to multiple SQS queues
@@ -575,7 +598,7 @@ If one stage of the pipeline fails, the entire process stops running.
 
 ### CodeCommit
 
-Ssource and version control. Allows access through git credentials, SSH keys and AWS access keys. Easiest way is to create Git credentials for IAM users and allow the devs to connect via HTTPS using these credentials. Repositories are automatically encrypted at rest.
+Ssource and version control. Allows access through git credentials, SSH keys and AWS access keys, not through IAM username and password. Easiest way is to create Git credentials for IAM users and allow the devs to connect via HTTPS using these credentials. Repositories are automatically encrypted at rest.
 
 ### CodeBuild
 
@@ -613,7 +636,7 @@ If the deployment fails and is getting rolled back, CodeDeploy first deploys to 
   * new instances provisioned, new release is installed on the new instance
   * No capacity reduction, green instances can be created ahead of time, easy to switch between old and new, and you pay for 2 envs until you terminate the old servers
   * Rolling back is easy, send the load balancer to the blue instances (prev version)
-  * DNS change, for rollback swap the URLs
+  * DNS change, for rollback *swap* the URLs
   * To maintain user sessions, use ElastiCache
 * Immutable
   * created in the same environment, under the same LB. a new autoscaling group created alongside the other one. Since the first new instance is created it starts to serve traffic. When the new instances are all healthy the old ones are switched off
