@@ -24,8 +24,11 @@ Table of contents
   * [Systems manager (SSM)](#systems-manager-ssm)
 * [IaaS: CloudFormation](#iaas-cloudformation)
 * [PaaS: Elastic beanstalk](#paas-elastic-beanstalk)
+* [Deployment](#deployment)
 * [Notifications](#notifications)
   * [SQS](#sqs)
+  * [SNS](#sns)
+  * [SES](#ses)
   * [Kinesis](#kinesis)
 * [Serverless](#serverless)
   * [Amazon API Gateway](#amazon-api-gateway)
@@ -73,7 +76,7 @@ aws ec2 monitor-instances --instance-ids i-1234567890abcdef0
 
 ### EBS
 
-Highly available (automatically replicated within a single AZ but AZ locked) and scalable storage volume that can be attached to the EC2 instance. Upon launch of an instance, at least one EBS volume is attached to it. Types:
+Highly available (automatically replicated within a single AZ but *AZ locked*) and scalable storage volume that can be attached to the EC2 instance. Upon launch of an instance, at least one EBS volume is attached to it. Types:
 
 * **gp2**: general purpose SSD, boot disks and general applications. the only option that can be a boot volume. up to 16k IOPS per volume
 * **io1**: provisioned IOPS SSD: higher IOPS, many read/writes per second. For large dbs, latency-sensitive workloads. highest performance option, most expensive. **io2**, new generation, more IOPS per GiB.
@@ -173,7 +176,7 @@ Whenever an object is uploaded, a HTTP 200 result code and MD5 checksum, taken t
 
 > Downloading
 
-Users can download a private file directly from a static website hosted on S3 by a *pre-signed URL link* on the site.
+Users can download a private file directly from a static website hosted on S3 by a *pre-signed URL link* on the site. When setting this up, you can set an expiration date and time.
 
 For get-intensive S3 buckets, use random prefix and CloudFront to cache the requests. When using CloudFront, to minimize upload speed, use S3 transfer acceleration. For customizing content distributed via CloudFront, use Lambda@Edge. CloudFront can use HTTPS between clients and CF, and between CF and backend.
 
@@ -218,6 +221,8 @@ Multi-AZ doesn't improve performance of the db, secondary host doesn't handle ac
 
 For backup that should be retained for long time, create a cron event in CloudWatch, which triggers a Lambda function that triggers the db snapshot.
 
+To make all-or-nothing operations, use RDS MySQL to make both operations in a single transaction block.
+
 > Read replica
 
 It's a read-only db instance, updates to source are *asynchronously* replicated to read replica (eventual consistency). For accessing it, use the DNS endpoint. Querying a read replica might mean you receive stale or old data. When to use read replica?
@@ -240,7 +245,7 @@ Non-relational serverless db stored on SSD, spread across 3 geographically disti
 
 > Consistency and throughput
 
-Read operations can be query, scan or GetItem. These return all attributes by default: to get just some, use a projection expression. For fetching multiple items in a single API call, use BatchGetItem.
+Consistency only applies to read operations, which can be query, scan or GetItem. These return all attributes by default: to get just some, use a projection expression. For fetching multiple items in a single API call, use BatchGetItem.
 
 1 RCU = 1 strongly consistent read/s, or 2 eventually consisteny read/s for an item up to 4kb in size. For larger files, additional RCU units are necessary. Strongly consistent reads consume twice the RCU as eventually consisten reads.
 
@@ -276,7 +281,7 @@ When read and write are distributed unevenly, a "hot" partition can receive a hi
 
 DynamoDB accelerator (DAX) is a fully managed, clustered in-memory cache for DynamoDB. It improves response times for eventually consistent reads only. You point the API calls to the DAX cluster instead of your table. DAX cluster passes all requests to DynamoDB and doesn't cache for these requests. It's not suitable for apps requiring strongly consistent reads, or write intensive apps.
 
-For backup, DynamoDB has 2 built-in backup methods: on-demand and point-in-time recovery. Both write to S3, but you can't access the s3 buckets for a download.
+For backup, DynamoDB has 2 built-in backup methods: on-demand and point-in-time recovery, which provides continuous backups of the table data. When enabled, DynamoDB maintains incremental backups of your table for the last 35 days until you explicitly turn it off.
 
 ### Elasticache
 
@@ -317,7 +322,7 @@ Users need to have IAM activated if they want access to Billing and Cost managem
 
 With IAM variables, you can use policy variables and create a single policy that applies to multiple users. You can make a policy that gives each user in the group full programmatic access to a user-specific object (their own "home directory") in S3.
 
-* To check a profile's permissions, use the CLI `--dry-run` option, which checks the permissions but doesn't make the request
+* To check a profile's permissions, use the CLI `--dry-run` option, which checks the permissions but doesn't make the request. Useful to test if a profile can do a certain action
 * To check custom policies, test out the permissions by getting the context keys, and use the `aws iam simulate-custom-policy` command
 * To check unused IAM roles, use Access advisor feature on IAM console
 * IAM access analyzer lets you see AWS resources that are shared with an external entity, it lets you identify unintended access to your resources and data.
@@ -327,7 +332,7 @@ With IAM variables, you can use policy variables and create a single policy that
 Web identity federation (WIF) allows users to authenticate with a WI provider (WIP): Google, Facebook, Amazon. The user authenticates first with the Web ID provider and receives an authentication token, which is exchanged for tmp AWS credentials allowing them to assume an IAM role. Cognito works with MFA authentication.
 
 * Cognito **user pools**: manage user directories, user sign-up and sign-in directly, or via WIPs. It acts as an identity broker, handling all interaction with WIPs and uses push sync with SNS to push updates and sync user data across devices. User pools let you create customizable authentication and authorization solutions for your REST APIs.
-* Cognito **identity pools** allow temporary, privilege-limited access for users. unique identities for your users and authenticate them with identity providers. Users' roles can get rules, and they're evaluated in sequential order & IAM role for first matching rule is used, unless a 'CustomRoleArn' is specified to override the order
+* Cognito **identity pools** allow temporary, privilege-limited access for trusted users for specific AWS resources. unique identities for your users and authenticate them with identity providers. Users' roles can get rules, and they're evaluated in sequential order & IAM role for first matching rule is used, unless a 'CustomRoleArn' is specified to override the order
 * Cognito **Sync** allows cross device data sync without requiring your own backend
 * Cognito **streams** allows control and insight into the data stored in Cognito. You can configure a kinesis stream to receive events as data is updated and synchronized. Cognito can push each dataset change to a Kinesis stream in real-time 
 
@@ -341,7 +346,7 @@ STS AssumeRoleWithWebIdentity is part of the security token service, it allows u
 
 * KMS, key management service, for creating and storing encryption keys. useful for sensitive information. KMS encryption keys are regional. Up to 4KB can be encrypted. For bigger keys, envelope encryption.
 * CMK, customer master key: used for data keys
-* Envelope encryption: first the data is encrypted using a plaintext Data key. This key is then further encrypted with a plaintext Master key. This way, only the data key goes over the network, not the data itself.
+* Envelope encryption: first the data is encrypted using a plaintext Data key. This key is then further encrypted with a plaintext Master key. This way, only the data key goes over the network, not the data itself. This method requires code changes
 
 ### Systems manager (SSM)
 
@@ -355,15 +360,15 @@ AWS resources defined in a YAML script. CF should be used for VP configs, securi
 * **Transforms** required field. if this is used, it means the document is a SAM template
 * **Resources** required field. defines the resources and their properties
   * Can reference a nested stack, which must be previously saved in S3
-  * `!GetApp` returns the value of an attribute from a resource in the template
+  * `!GetAtt` returns the value of an attribute from a resource in the template, can't receive inputs
 * **Conditions** section includes conditions that control whether certain resource properties are assigned a value during stack creation or update
 * **Parameters** to *pass values* such as passwords to the template at runtime. Does not allow conditions. Allows the data types of string, number and list.
 * **Mappings** of keys and values that can specify conditional parameter values
-  * `!FindinMap` returns the value of a key of a variable in the section. Use this for the map of the base AMIs.
+  - `!FindInMap` returns the value corresponding to keys in a two-level map that is declared in this section
 * **Outputs** declares output values that you can import into other stacks, return in response or view on CF console. Use Export field for this
   * With a cross-stack reference, owners of the web app stacks don't need to create or maintain networking rules or assets
 
-Intrinsic functions in templates are used to assign values to properties that aren't available until runtime. `Ref` returns the value of the specified parameter or resource, but cannot import values.
+Intrinsic functions in templates are used to assign values to properties that aren't available until runtime. `Ref` returns the value of the specified parameter or resource, but cannot import values. It can accept input value from the user.
 
 If part of the CF deployment fails due to a misconfiguration, CF rollbacks the entire stack. If one of the resources in a stack can't be created, previously created resources get deleted and the stack creation terminates. Termination Protection stack option prevents accidental deletion of an entire CloudFormation stack.
 
@@ -384,19 +389,12 @@ CLI commands:
 
 Deploy and scale web apps, without provisioning underlying servers, LBs, security groups etc.. It supports the deployment of web apps from Docker. If the on-premise application doesn't use Docker and can't seem to find a relevant environment in Beanstalk, use Packer to create a custom platform.
 
-> Deployment
-
-* All at once: quickest, reduced availability
-* Rolling: longer, no downtime and minimizes reduced availability. the app is deployed to your environment one batch of instances at a time. Most bandwidth is retained throughout the deployment.
-* Rolling with additional batch: even longer, no downtime, no reduced availability, bandwidth maintained.
-* Immutable: longest, no downtime, no reduced availability, new version is deployed to new instances, quick and safe rollback, automatic ASG launched to serve traffic to new version alongside the old version until the new instances pass health checks. 
-* Traffic splitting / canary testing: useful if you want to test the health of your new application version using a portion of incoming traffic, while keeping the rest of the traffic served by the old application version.
-
 > Launch
 
 * User can customize an AMI instead of the standard one. It can make launch faster if dependencies are preloaded and prepackaged in the AMI
   * If a lot of server configs is needed, just make a custom AMI instead of configuring and customizing environment
 * If Beanstalk performs tasks that take a long time: offload the tasks to a dedicated worker environment
+* Traffic splitting / canary testing: useful if you want to test the health of your new application version using a portion of incoming traffic, while keeping the rest of the traffic served by the old application version
 
 > Config
 
@@ -415,19 +413,31 @@ Other configurations
 
 Whenever a new version is uploaded to Beanstalk, it creates an app version. If the older ones aren't deleted, eventually the app version limit is reached. This can be avoided by applying an application version lifecycle to the apps. This tells Beanstalk to delete old app versions or to delete app versions when the total \# versions for an app exceeds a number
 
+## Deployment
+
+| Deployment type | Speed | Downtime | Availability reduction | Deploy to | Rollback | Cost |
+|-|:-:|:-:|:-:|:-:|:-:|:-:|
+| All at once | Fastest | Yes | Yes | Existing instances | Manual | Low |
+| Rolling | Fast | No | Yes | Existing instances | Manual | Low |
+| Rolling with additional batch | Slow | No | No | Existing instances | Manual | Higher |
+| Blue/green: new env | Slower | No | No | New instances | Automatic,  point LB to older versions | Highest |
+| Immutable: same env | Slower | No | No | New instances | Automatic, terminate new instances | Highest |
+
+* Blue/green: new environment, new LB but using the same autoscaling group (or weighted routing policy in Route 53). The switch is performed at DNS level routing the traffic from the old env to the new when the new env is ready and healthy. Instant complete switch from old to new version
+* Immutable: same environment, same LB but new autoscaling group. From the moment a new instance is created, it serves traffic. When the new instances are all healthy, switch off the old ones.
+
 ## Notifications
 
 ### SQS
 
-Highly-durable pull-based queue, useful for persist in-flight transactions. It has no strict ordering and might contain duplicates. It automatically scales based on demand but doesn't automatically delete messages, the app has to issue the command.
+Highly-durable pull-based queue, useful for persist in-flight transactions. It has no strict ordering and might contain duplicates. To delete messages, a command is necessary, it's not automatic.
+
+**Visibility timeout**: amount of time that the message is invisible in the SQS after a reader picks up the message. Makes sure that the message isn't read by any other consumer while it's being processed by one. If the job isn't processed in that time, the msg becomse visible again and another reader will process it. Default timeout is 30s, can be increased up to 12h.
 
 * Message size limit is 256kb. For larger messages, store the messages in S3 and use Amazon SQS extended client library for Java to manage them, and also the AWS SDK for Java.
-* No message limits for storing in SQS, but 'in-flight messages' (received from a queue by a consumer, but not yet deleted from queue) max 120k inflight messages
-* When retrieving messages from a queue, you specify the max \# messages (up to 10) that you want to receive
+* No message limits for storing in SQS, but max 120k 'in-flight messages' (received from a queue by a consumer, but not yet deleted from queue)
+* When retrieving messages from a queue, you can retrieve max 10 messages
 * Retention period default is 4 days, but you can increase the queue message retention up to 14 days with Set QueueAttributes action
-* Visibility timeout default is 30s, can be increased up to 12h.
-
-Visibility timeout: amount of time that the message is invisible in the SQS after a reader picks up the message. Makes sure that the message isn't read by any other consumer while it's being processed by one. If the job isn't processed in that time, the msg becomse visible again and another reader will process it
 
 > Types of queues
 
@@ -442,14 +452,7 @@ If there are multiple senders, each sender's messages must be processed in order
 * Short polling: returns a response immediately. Some messages might not get received, because short polling doesn't return all messages. It has additional cost
 * Long polling: periodically poll the queue, response is returned only when a msg arrives or the long poll times out. Retrieves all messages. Can save money. To have the shortest delay, use `ReceiveMessageWaitTimeSeconds`. To reduce costs even more, group the SQS API operations in batches.
 
-> Security
-
-* Use SQS server side encryption
-* Restrict access as per policy defined
-* Use HTTP over TSL
-* Encrypt message before pushing into SQS
-
-SNS
+### SNS
 
 * Push-based asynchronous simple notification service with durable storage to send notifications from the cloud
 * It can deliver push notifications, SMS and emails to any HTTP endpoint, and it can trigger a Lambda function. SES is not an endpoint. Can't receive anything
@@ -457,13 +460,13 @@ SNS
 * Useful when sending a message and its metadata at the same time
 * SNS can be used in conjunction with SQS to fan a single message out to multiple SQS queues
 
-SES
+### SES
 
 Scalable and highly available email service. Pay as you go model, it send and receive emails. It can trigger SNS and Lambda. It can be used for automated emails, online purchases, marketing emails. SES is not a valid target for CloudWatch Events.
 
 ### Kinesis
 
-Family of services to analyze streaming data in real time. 
+Family of services to analyze streaming data in real time.
 
 > Shards
 
@@ -481,8 +484,11 @@ The partition key is used by KDS to distribute data across shards, and it's used
 
 * **Data streams**: stream data/video
   * Strict ordering and duplicates, unlimited \# consumers
+  * Allows KMS encryption for data at rest, and encryption in flight with HTTPS endpoint
   * With enhanced fanout, multiple users can retrieve data from a stream in parallel. Stream consumers can be registered to receive their own 2MB/s pipe of read throughput per shard, with an average message propagation delay of 70ms for all consumers
-* **Data firehose**: capture, transform, load streams into AWS data stores, when streamling directly into S3 for example. no analysis. To encrypt data, enable encryption on firehose and ensure that kinesis streams are used to transfer data from the producers
+* **Data firehose**: capture, transform, load streams into AWS data stores, when streamling directly into S3 for example. no analysis
+  - To encrypt data, enable encryption on firehose and ensure that kinesis streams are used to transfer data from the producers
+  - Firehose allows Elasticsearch, Redshift and S3 as sink types. Not ElastiCache, since it's not a storage type
 * **Data analytics**: analyze, query and transform streamed data in real-time using standard SQL and save in an AWS data store
 
 ## Serverless
@@ -496,15 +502,13 @@ SAM is the serverless application model, to define and provision serverless apps
 
 ### Amazon API Gateway
 
-It's a service to manage APIs at any scale. Can't be integrated with Docker. Users make a request to the API gateway, and this redirects the request to EC2, Lambda, etc. First of all a deployment must be created in API Gateway. When changing the API, redeploy it to an existing stage or to a new stage.
+It's a service to manage APIs at any scale. Users make a request to the API gateway, and this redirects the request to EC2, Lambda, etc. First of all a deployment must be created in API Gateway. When changing the API, redeploy it to an existing stage or to a new stage.
 
-* Lambda authorizer is a Lambda function controlling access to the API. This helps in access control
 * API caching can be enabled for popular requests, it caches responses from the endpoint for a specified TTL period. Default is 300s, max can be 3600. If it's 0, caching is disabled
   * To invalidate caching, send header with Cache-Control: max-age=0
-* API gateway can be throttled to prevent attacks
 * Frontend: method, backend: integration
-
-If a request is comming like an XML, the request and response data mapping template will map it to JSON.
+* Docker is not supported
+* If a request is comming like an XML, the request and response data mapping template will map it to JSON
 
 ```bash
 # passing a stage variable to an HTTL URL
@@ -515,7 +519,9 @@ http://example.com/${stageVariables.<variable_name>}/prod
 > Security
 
 * For access from different domains, use CORS: Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Origin. It can also be used to deny cross-domain access.
-* To deny specific IP addresses from accessing API Gateway, use WAF or resource policies.
+* To deny specific IP addresses from accessing API Gateway, use WAF or resource policies
+* Lambda authorizer is a Lambda function controlling access to the API
+* API gateway can be throttled to prevent attacks
 
 ### Lambda
 
@@ -592,80 +598,53 @@ CodeStar handles all aspects of development and deployment on AWS.
 
 ### CodePipeline
 
-Manages the whole workflow whenever a change is detected in the source code. If the pipeline needs **needs approval**, add a manual approval step at the end of the flow.
-
-If one stage of the pipeline fails, the entire process stops running.
+* Manages the whole workflow whenever a change is detected in the source code
+* If the pipeline needs needs approval, add a manual approval step at the end of the flow
+* If one stage of the pipeline fails, the entire process stops running
 
 ### CodeCommit
 
-Ssource and version control. Allows access through git credentials, SSH keys and AWS access keys, not through IAM username and password. Easiest way is to create Git credentials for IAM users and allow the devs to connect via HTTPS using these credentials. Repositories are automatically encrypted at rest.
+* Source and version control
+* Allows access through git credentials, SSH keys and AWS access keys, not through IAM username and password. Create Git credentials for IAM users and allow the devs to connect via HTTPS using these credentials
+* Repositories are automatically encrypted at rest
 
 ### CodeBuild
 
-Automated build, runs tests, produce packages. CodeBuild scales automatically to meet peak build requests.
+Automated build, runs tests, produce packages. The `buildspec.yml` file specifies the build configurations, should be in the root folder.
 
-* If the build fails, run it locally using CodeBuild Agent. Then, you can test the integrity and content of a buildspec.yml file locally (root folder), test and build an app locally before commiting. Check CloudWatch logs for debugging.
+* It scales automatically to meet peak build requests
+* If the build fails, run it locally using CodeBuild Agent
+* For very big dependencies, bundle them all in the source coude during the last stage of CodeBuild, thus reducing the build time
+* Logs are in CloudWatch, they can be exported to S3
 
-For very big dependencies, bundle them all in the source coude during the last stage of CodeBuild. You can reduce the build time by caching dependencies.
-
-Integrates with CloudWatch to show \# total builds, failed builds, etc. You can export log data to S3. CloudWatch events can be integrated too, but this doesn't store logs anywhere.
-
-To override build commands without touching the code or editing the project, run the start build CLI command with buildspecOverride property to set the new buildspec.yml file, which should be in the root directory.
+To override build commands without touching the code or editing the project, run the start build CLI command with buildspecOverride property to set the new buildspec.yml file.
 
 ### CodeDeploy
 
-Automated deployments to EC2, Lambda, on-premises. Steps: ApplicationStop --> BeforeInstall --> DownloadBundle --> AfterInstall -> ApplicationStart --> ValidateService (to verify success)
+Automated deployments to EC2, Lambda, or to on-premises. With a CodeDeploy agent in an EC2 instance, the instances can be used in Codedeploy deployments. The agent cleans up log files to conserve disk space. With Codedeploy deployment groups, EC2 instances are a set of individual instances targeted for deployment.
 
-If the deployment fails and is getting rolled back, CodeDeploy first deploys to the failed instances. A new deployment of the last known working version is deployed with a new deployment ID.
+> Steps: ApplicationStop --> BeforeInstall --> DownloadBundle --> AfterInstall -> ApplicationStart --> ValidateService (to verify success)
 
-* All at once: if failed, downtime. Very fast, for rollback it needs manual redeploy. Code is deployed to existing instances.
-* in place/rolling
-  * The app is stopped on each instance and new release installed. Code is deployed to the existing instances
-  * Capacity is reduced during deployment
-  * Rolling back requires manually re-deploying the previous version
-  * If failed deployment, single batch out of service.
-  * In a fleet of instances, rolling deployment deploys in batches. Some instances start with the new version while the rest has old version, then more and more instances get the new version
-* Rolling with additional batch
-  * An extra batch of instances is launched, code deployed to new and existing instances
-  * **Bandwidth** and availability maintained
-  * Takes longer than the Rolling deployment
-  * If failed deployment, similar to rolling
-* blue/green: own autoscaling group is used for this, weighted routing policies on Route 53 can be used too.
-  * new env created from scratch, another LB. The switch is performed at DNS level routing the traffic from the OLD to the NEW when the new environment is ready and healthy. Instant complete switch from old to new version
-  * slowest deployment method
-  * new instances provisioned, new release is installed on the new instance
-  * No capacity reduction, green instances can be created ahead of time, easy to switch between old and new, and you pay for 2 envs until you terminate the old servers
-  * Rolling back is easy, send the load balancer to the blue instances (prev version)
-  * DNS change, for rollback *swap* the URLs
-  * To maintain user sessions, use ElastiCache
-* Immutable
-  * created in the same environment, under the same LB. a new autoscaling group created alongside the other one. Since the first new instance is created it starts to serve traffic. When the new instances are all healthy the old ones are switched off
-  * New instances serve traffic alongside the old ones during deployment
-  * no DNS change, for rollback terminate the new instances
-
-The deployment config file, appspec.yml file must be in the root folder of the repo
+* `appspec.yml` is the deployment config file, it must be in the root folder
   - When working with Lambda, specify the version in appspec.yml
   - the hooks section determines the scripts that are run in the lifecycle event hooks
 
-With a CodeDeploy agent in an EC2 instance, the instances can be used in Codedeploy deployments. The agent cleans up log files to conserve disk space.
+> Rollback
 
-With Codedeploy deployment groups, in EC2 they're a set of individual instances targeted for deployment.
+If the deployment fails, CodeDeploy first deploys to the failed instances. A new deployment of the last known working version is deployed with a new deployment ID.
 
-For rollback, if the prev version's files are unreachable, they have to be manually added to the instance, or a new app revision must be created.
+If the previous version's files are unreachable, they have to be manually added to the instance, or a new app revision must be created.
 
 ### ECS
 
-A container orchestration service supporting docker. It uses Fargate for serverless, or you can use EC2 for more control. First upload the image to ECR, elastic container registry. ECS connects to ECR and deploys the images.
+A scalable container orchestration service supporting docker. It uses Fargate for serverless, or you can use EC2 for more control. First upload the image to ECR, elastic container registry. ECS connects to ECR and deploys the images.
 
 To log in, run `aws ecr get-login`, use the output to login to ECR, and then pull the image with `docker pull REPOSITORY URI : TAG`
 
 * To allow the container to access SQS, the policy must be attached to the ECS Task's execution role
-* To use X-Ray with ECS, create a separate Docker image to run the X-Ray daemon
+* To use X-Ray with ECS, create a separate Docker image to run the X-Ray daemon, add instrumentation to the app code for X-Ray and configure and use an IAM role for tasks.
 * If the container should share storage, use Fargate launch
-
-When you use ECS with a load balancer deployed across multiple AZs, you get a scalable and highly available REST API.
-
-To run X-Ray within ECS, create an image running the X-Ray daemon (so an additional image), add instrumentation to the app code for X-Ray and configure and use an IAM role for tasks.
+* When you use ECS with a load balancer deployed across multiple AZs, you get a scalable and highly available REST API.
 
 ### OpsWorks
 
