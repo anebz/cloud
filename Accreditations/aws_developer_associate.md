@@ -5,42 +5,43 @@
 
 Table of contents
 
-* [Compute](#compute)
-  * [EC2](#ec2)
-  * [ECS](#ecs)
-  * [Lambda](#lambda)
-* [Monitoring](#monitoring)
-  * [Cloudwatch](#cloudwatch)
-  * [X-Ray](#x-ray)
-* [Networking](#networking)
-* [Security](#security)
-  * [IAM](#iam)
-  * [Cognito](#cognito)
-  * [STS](#sts)
-  * [Encryption](#encryption)
-  * [Systems manager](#systems-manager)
-  * [OpsWorks](#opsworks)
-* [Notifications](#notifications)
-  * [SQS](#sqs)
-  * [SNS](#sns)
-  * [SES](#ses)
-  * [Kinesis](#kinesis)
-* [Storage and databases](#storage-and-databases)
-  * [S3](#s3)
-  * [EBS](#ebs)
-  * [RDS](#rds)
-  * [Aurora](#aurora)
-  * [DynamoDB](#dynamodb)
-  * [Elasticache](#elasticache)
-* [CloudFormation](#cloudformation)
-* [Elastic beanstalk](#elastic-beanstalk)
-* [Deployment](#deployment)
-* [Amazon API Gateway](#amazon-api-gateway)
-* [Developer tools](#developer-tools)
-  * [CodePipeline](#codepipeline)
-  * [CodeCommit](#codecommit)
-  * [CodeBuild](#codebuild)
-  * [CodeDeploy](#codedeploy)
+- [AWS Certified developer associate](#aws-certified-developer-associate)
+  - [Compute](#compute)
+    - [EC2](#ec2)
+    - [ECS](#ecs)
+    - [Lambda](#lambda)
+  - [Monitoring](#monitoring)
+    - [Cloudwatch](#cloudwatch)
+    - [X-Ray](#x-ray)
+  - [Networking](#networking)
+  - [Security](#security)
+    - [IAM](#iam)
+    - [Cognito](#cognito)
+    - [STS](#sts)
+    - [Encryption](#encryption)
+    - [Systems manager](#systems-manager)
+    - [OpsWorks](#opsworks)
+  - [Notifications](#notifications)
+    - [SQS](#sqs)
+    - [SNS](#sns)
+    - [SES](#ses)
+    - [Kinesis](#kinesis)
+  - [Storage and databases](#storage-and-databases)
+    - [S3](#s3)
+    - [EBS](#ebs)
+    - [RDS](#rds)
+    - [Aurora](#aurora)
+    - [DynamoDB](#dynamodb)
+    - [Elasticache](#elasticache)
+  - [CloudFormation](#cloudformation)
+  - [Elastic beanstalk](#elastic-beanstalk)
+  - [Deployment](#deployment)
+  - [Amazon API Gateway](#amazon-api-gateway)
+  - [Developer tools](#developer-tools)
+    - [CodePipeline](#codepipeline)
+    - [CodeCommit](#codecommit)
+    - [CodeBuild](#codebuild)
+    - [CodeDeploy](#codedeploy)
 
 ## Compute
 
@@ -260,6 +261,8 @@ Web identity federation (WIF) allows users to authenticate with a WI provider (W
 
 Security token service: used to request *temporary* (expire after 1h), limited-privilege credentials for IAM users or for users you authenticate. Not supported by API gateway for authentication.
 
+If an encoded authorization message is received when accessing an AWS resource, use STS decode-authorization-message
+
 * `AssumeRoleWithWebIdentity` allows users who have authenticated with a WIP to access AWS resources. If successful, STS returns temporary credentials
 * `AssumedRoleUser` ARN and `AssumedRoleID` are used to programatically retrieve the identifiers for the temporary security credentials. 
 
@@ -350,51 +353,51 @@ The partition key is used by KDS to distribute data across shards, and it's used
 
 ### S3
 
-Serverless storage service, best suited for objects and BLOB data. S3 has a pricing for every TB for month. For log files, if objects change frequently it needs update buffering. 
-
-Avoid using reduced redundancy and don't use S3 for static web hosting, since HTTPS is not allowed. When creating a static website hosting, you can configure index document, error document and conditional redirection on object name. It's not possible to configure conditional error on object name.
-
-When using CloudFormation to delete buckets, make sure that all objects are deleted before deleting the bucket.
+* Serverless storage service, best suited for objects and BLOB (binary large object) data
+* Pricing is for every TB for month
+* When using CloudFormation to delete buckets, make sure that all objects are deleted before deleting the bucket
 
 > Uploading
 
-A single PUT can upload objects up to 5GB. To upload larger files, use multi-part upload. S3 doesn't support object locking for concurrent updates
-
-* When writing a new object to S3 and immediately listing the keys within a bucket, the object might not appear in the list until the change is fully propagated
-* When deleting an object and immediately trying to read it or list it, S3 might return the deleted data until the change fully propagated
-
-When a large number of objects are uploaded, to improve performance, add a hash prefix to the folder. Introducing randomness as key prefix improves performance. If all files are in the same folder, add the key prefix to the object.
-
-Whenever an object is uploaded, a HTTP 200 result code and MD5 checksum, taken together, indicate that the operation was successful.
+* Max file size is 5GB. To upload larger files, use multi-part upload
+* Object locking for concurrent updates not supported
+* PUT is eventually consistent: when immediately listing the keys within a bucket after uploading a file, the object might not appear in the list
+* DELETE is eventually consistent: when trying to read/list a recently deleted bucket, S3 might return the deleted data
+* To improve performance when many files are uploaded/downloaded, add a hash prefix to the folder or if all files are in the same folder, add the key prefix to the object
+* A sucessful upload results in a HTTP 200 result code and MD5 checksum
 
 > Downloading
 
-Users can download a private file directly from a static website hosted on S3 by a *pre-signed URL link* on the site. When setting this up, you can set an expiration date and time.
+If a bucket is private but object should be accessed, use a *pre-signed URL link* to access the file only. This access can have an expiration time.
 
-For get-intensive S3 buckets, use random prefix and CloudFront to cache the requests. When using CloudFront, to minimize upload speed, use S3 transfer acceleration. For customizing content distributed via CloudFront, use Lambda@Edge. CloudFront can use HTTPS between clients and CF, and between CF and backend.
+To improve download performance, enable CloudFront to cache it. After, to minimize download speed, enable S3 transfer acceleration. For customizing content distributed via CloudFront, use Lambda@Edge. CloudFront can use HTTPS between clients and CF, and between CF and backend.
 
 > Objects
 
-S3 versioning: by creating new versions for each change the previous changes can be recovered. Overwriting, deleting files create a new version. Previous, unversioned files get the 'null' version. Versioning can be enabled for all objects in a bucket.
-
-* S3 Select enables SQL expressions to select a subset of the data
-* S3 inventory can be used to audit and report on the replication & encryption status of the objects. Use this when getting an HTTP 503 error after many PUT operations
-* S3 analytics: analyze storage acess patterns, to change storage class for example
-* S3 access logs: records for the requests that are made to a bucket. Useful for security and access auditing
+* *S3 versioning*: creates a new version whenever a file is overwritten or deleted
+  * Protects from accidental deletes
+  * Previous, unversioned files get the 'null' version
+* *S3 Select*: SQL expressions to select a subset of the data
+* *S3 inventory*: to audit and report on the replication & encryption status of the objects. Use this when getting an HTTP 503 error after many PUT operations
+* *S3 analytics*: analyze storage access patterns, to change storage class for example
 
 > Security
 
-Data can be secured with access control lists in file level (ACL) and bucket policies in bucket level. 
+Data can be secured with access control lists in file level (ACL) and bucket policies in bucket level. S3 access logs is security and access auditing of the requests that are made to the bucket.
 
-Encryption **in transit is called SSL/TLS**, at rest it can be:
+S3 uses a log delivery account, Log Delivery group, to write access logs. This group will need group write permissions on the target bucket by adding a grant entry in the bucket's ACL. If the logging is redirected to the bucket itself, it will grow exponentially.
 
-* Server side encryption, protecting data at rest. Can be enforced by using a bucket policy that denies S3 PUT requests that don't include the SSE parameter in the request header. Useful to audit trail of who has used the keys.
-  * S3 managed keys (SSE-S3): each object is encrypted with a unique key, and S3 encrypts the key itself with a master key that it regularly rotates. `s3:x-amz-server-side-encryption": "AES256`
-  * AWS KMS managed keys (SSE-KMS), you can set up an envelope key which encrypts the key. You can use AWS-managed CMK or customer-managed CMK. `s3:x-amz-server-side-encryption": "aws-kms`
-  * Server side encryption with customer provided keys (SSE-C). Then the customer needs to send the keys and encryption algorithm with each API call. For this situation, if the request is made over HTTP, S3 rejects it.
-* Client side encryption: used for encryption **in transit**
+Encryption:
 
-S3 uses a special log delivery account, Log Delivery group, to write access logs. This group will need group write permissions on the target bucket by adding a grant entry in the bucket's ACL.
+* Server side encryption (SSE), protects data at rest. For example, a bucket policy that denies S3 PUT requests that don't include the SSE parameter in the request header
+  * S3 managed keys (SSE-S3): a unique key encrypts each object, and the key itself is encrypted with a master key that is regularly rotated. It uses AES-256 for encryption. The header for a request with this encryption is: `s3:x-amz-server-side-encryption": "AES256`
+  * AWS KMS managed keys (SSE-KMS), KMS manages *data* key, the customer *master* key can be customer managed or created by KMS directly. `s3:x-amz-server-side-encryption": "aws-kms`
+  * Server side encryption with customer provided keys (SSE-C): customer must manage the encryption key. No code necessary to encrypt or decrypt, only necessary to manage the encryption key you provide. In each API call, the customer needs to send the keys and encryption algorithm. For this situation, if the request is made over HTTP, S3 rejects it.
+* Client side encryption: used for encryption in transit via SSL/TLS
+
+> Static web hosting
+
+* When creating a static website hosting, you can configure index document, error document and conditional redirection on object name. It's not possible to configure conditional error on object name.
 
 > Cross-region
 
@@ -404,79 +407,76 @@ To replicate a bucket in another region:
 2. Enable cross-origin resource sharing (CORS) on bucket2: a bucket1 from region A can access files from bucket2
 3. Bucket1 needs permission to replicate objects from bucket2
 
-With CORS, you can build rich client-side web apps with S3 and selectively allow cross-origin access to S3 resources. To do this, create a CROS configuration with an XML doc with rules that identify the origins that you allow to access the bucket, the operations (HTTP methods) that will support for each origin.
+CORS allows cross-origin access to S3 resources. To do this, create a CROS configuration with an XML doc with rules that identify the origins that you allow to access the bucket, the operations (HTTP methods) that will support for each origin.
 
 ### EBS
 
-Highly available (automatically replicated within a single AZ but *AZ locked*) and scalable storage volume that can be attached to the EC2 instance. Upon launch of an instance, at least one EBS volume is attached to it. Types:
+Highly available (automatically replicated within a single AZ but *AZ locked*) and scalable storage volume that can be attached to the EC2 instance, but can't share data between instances. Upon launch of an instance, at least one EBS volume is attached to it.
+
+Snapshots are incremental and they span the region, which means they aren't in the same AZ as the volume.
+
+> Volume types
 
 * **gp2**: general purpose SSD, boot disks and general applications. the only option that can be a boot volume. up to 16k IOPS per volume
-* **io1**: provisioned IOPS SSD: higher IOPS, many read/writes per second. For large dbs, latency-sensitive workloads. highest performance option, most expensive. **io2**, new generation, more IOPS per GiB.
-* **st1**: throughput optimized HDD: for read-intensive workloads, for frequently accessed workloads that need to store mountains of data, big data, data warehouses. large I/O sizes
+* **io2**: provisioned IOPS SSD: higher IOPS, many read/writes per second. For large dbs, latency-sensitive workloads. highest performance option, most expensive
+  * The maximum ratio of provisioned IOPS to the requested volume size (in GB) is 50:1. For example, a 100GB volume can be provisioned witih up to 5000 IOPS
+* **st1**: throughput optimized HDD: for read-intensive workloads, for frequently accessed workloads that need to store mountains of data, big data, data warehouses
 * **sc1**: cold HDD: lowest cost option, workloads where performance isn't a factor
-
-The maximum ratio of provisioned IOPS to the requested volume size (in GB) is 50:1. For example, a 100GB volume can be provisioned witih up to 5000 IOPS.
-
-EBSs are attached to an instance, and can't share data between instances.
-
-Snapshots are incremental, can be used to launch a new instance, but they span the region, which means they aren't in the same AZ as the volume.
-
-To encrypt a volume: snapshot the current volume, create an encrypted snapshot, restore the volume from the encrypted snapshot, mount it.
 
 > Encrpytion
 
-* EBS volumes support in-flight encryption and also at rest encryption using KMS
+* EBS supports in-flight encryption and also at rest encryption using KMS
+* To encrypt a volume: create an encrypted snapshot of the volume, restore the volume from the encrypted snapshot, mount it
 * An encrypted EBS volume always creates an encrypted snapshot, which always creates an encrypted EBS volume
 * Encryption by default is a region-specific setting. If enabled for a region, it can't be disabled for individual volumes or snapshots in that region
-* If an encoded authorization message is received, use STS decode-authorization-message
 
 ### RDS
 
-Multi-AZ provides a high availability, fault tolereant solution and the backup AZ provides the secondary host. Primary host handles all traffic, and replicates to the secondary host in a *synchronous* manner: a write to the primary host is written to the secondary host as well.
-
-Multi-AZ doesn't improve performance of the db, secondary host doesn't handle active write traffic. The writing to a multi-AZ database is a bit slower, and it costs double as single-AZ.
+Highly available, fault tolereant SQL-type database solution. Primary host in one AZ handles all traffic, and replicates to the secondary host in another AZ in a *synchronous* manner: a write to the primary host is written to the secondary host. The secondary host doesn't handle traffic.
 
 For backup that should be retained for long time, create a cron event in CloudWatch, which triggers a Lambda function that triggers the db snapshot.
 
 To make all-or-nothing operations, use RDS MySQL to make both operations in a single transaction block.
 
+RDS are monolithic, they have very coupled layers, if one is slow they are all slow. if one fails, they all fail. can't operate or scale independently.
+
 > Read replica
 
-It's a read-only db instance, updates to source are *asynchronously* replicated to read replica (eventual consistency). For accessing it, use the DNS endpoint. Querying a read replica might mean you receive stale or old data. When to use read replica?
-
-* Scaling: redirect excess read traffic to 1+ read replicas. you can create up to 5 read replicas
-* Source db unavailable. continue to serve read traffic while the source db instance is unavailable
-* Reporting or data warehouse. read replicas are excellent for businses reporting and data warehousing scenarios which only need read operations
-* Disaster recovery: promote a read replica to a standalone instance as a disaster recovery solution
-* Lower latency: hosting a cross region read replica can reduce latency for cross region applications
+* Used for read intensive databases
+* It's a read-only db instance, updates to source are *asynchronously* replicated to read replica (eventual consistency)
+  * Querying a read replica might return stale or old data
+* Up to 5 read replicas can be created
+* To access it, use the DNS endpoint
 
 ### Aurora
 
-RDMS are monolithic, very coupled layers, if one is slow they are all slow. if one fails, they all fail. can't operate or scale independently. Aurora is a self-healing cloud optimized relational db, distributed and elastic: it breaks apart the monolithic stack to enable a db that can scale out.
+Aurora is a self-healing cloud optimized relational db, distributed and elastic: it breaks apart the monolithic stack to enable a db that can scale out.
 
-Aurora moves out the logging and storage layers of the db into a multi tented, scale out db optimized storage service. In Aurora global, the primary region allows read & write, while the secondary region is read only. Aurora is not serverless by default, but can be made serverless.
+Aurora moves out the logging and storage layers of the db into a multi tented, scale out db optimized storage service. In Aurora global, the primary region allows read & write, while the secondary region is read only.
+
+Aurora is not serverless by default, but can be made serverless.
 
 ### DynamoDB
 
-Non-relational serverless db stored on SSD, spread across 3 geographically distinct data centers, immediately consistent and highly durable (unlike Redis). Can be used for web sessions, JSON docs, and metadata for S3 objects, scalable session handling, as well as Elasticache.
+Non-relational serverless db stored on SSD, spread across 3 geographically distinct data centers, immediately consistent and highly durable. Can be used for web sessions, JSON docs, and metadata for S3 objects, scalable session handling.
 
 > Consistency and throughput
 
-Consistency only applies to read operations, which can be query, scan or GetItem. These return all attributes by default: to get just some, use a projection expression. For fetching multiple items in a single API call, use BatchGetItem.
+Consistency only applies to read operations, which can be *query*, *scan*, *GetItem* or *BatchGetItem* for multiple items. These return all attributes by default: to get just some, use a projection expression.
 
-1 RCU = 1 strongly consistent read/s, or 2 eventually consisteny read/s for an item up to 4kb in size. For larger files, additional RCU units are necessary. Strongly consistent reads consume twice the RCU as eventually consisten reads.
+1 RCU = 1 strongly consistent read/s for an item of 4kb in size. For larger files, more RCU units. Transactional reads' RCU consumption = double consistent reads = double eventual reads. WCU is 1 per 1KB/s. RCU and WCUs are specific to one table.
 
-> A file of 15KB would need 4 reads. And for 100 strongly consistent reads, 100*4 = 400
+> How many RCUs does a file of 15KB need for 100 strongly consistent reads? 15 / 4 = 4, 100*4 = 400 RCUs. For eventual consistency, 200 RCUs.
 
-For transactional read requests, the formula is: 2RCU = 4KB/s. For a file of 5KBs, 4 RCU. And then multiply by items. WCU is 1 per 1KB/s. RCU and WCUs are specific to one table.
-
-For the highest throughput questions, choose eventual consistency, maximum reads capacity * max item size. For high latency issues, use eventually consistent reads instead of strongly consistent reads whenever possible, and use global tables if the app is accessed by globally distributed users. Also use exponential backoff in the requests.
+For the highest throughput questions, choose eventual consistency, maximum reads capacity * max item size. For high latency issues, use eventually consistent reads instead of strongly consistent reads.
 
 > Security
 
-All DynamoDB tables are encrypted at rest with an AWS owned key by default. Access is controled using IAM policies. Fine grained access control using IAM condition parameter: `dynamodb:LeadingKeys` to allow users to access only the items where the partition key value matches their user ID. With an IAM policy, you can specify conditions when granting permissions. Read-only access to certain items/attributes, or write-only based upon the identity of the user.
+* By default, DynamoDB tables are encrypted at rest with an AWS owned key
+* Access is controlled using IAM policies: conditions can be specified when granting permissions: read-only access to certain items/attributes, or write-only based upon the identity of the user
+  * With `dynamodb:LeadingKeys`, users can only access the items where the partition key value matches their user ID
 
-> Table settings
+> Keys and indexs
 
 An item can have more than one attributes. The primary key can be single key (partition key) or composite key (partition key + sort key). The partition key and sort key can be different from the base table.
 
@@ -484,33 +484,38 @@ A local secondary index can only be created at the time of table creation, but a
 
 LSIs and GSIs can coexist. LSIs use the RCU and WCU of the main table, which can't be changed. GSIs are stored in their own partition space away from the base table, and scale separately from the base table.
 
+> Queries
+
 Query results are more efficient than a scan, and they're always sorted in ascending order by the sort key if there is one. If querying in an attribute *not* part of partition/sort key, querying that is the same as scanning. Parallel scans while limiting the rate minimize the execution time of a table lookup.
 
-The number of tables per account and number of provisioned throughput units per account can be changed by raising a request. A conditional action is an action only to be taken if certain attributes of the item still have the values you expect.
+The number of tables per account and number of provisioned throughput units per account can be changed by raising a request. Use global tables if the app is accessed by globally distributed users.
+
+A conditional action is an action only to be taken if certain attributes of the item still have the values you expect. If requests are being throttled because of exceeded throughput, use exponential backoff in the requests.
 
 When read and write are distributed unevenly, a "hot" partition can receive a higher volume of read and write traffic compared to other partitions. DynamoDB adaptive capacity enables the app to continue reading/writing to hot partitions without being throttled, provided that traffic doesn't exceed the table's or partition's max capacity.
 
-* **DynamoDB TTL** is a time to leave attribute to *remove* irrelevant or old data which sets the time in Unix/Posix epoch times, the \#seconds since 1970/1/1.
+* **DynamoDB TTL** is a time to leave attribute to *remove* data after certain time
 * **DynamoDB streams** is a time-ordered sequence of item level modifications in the DynamoDB tables, can be used as an event source for Lambda to take action based on events in the table. You can use it when a record is inserted to table2 whenever items are updated in table1
 * **DynamoDB transactions**: to do coordinated, all-or-nothing changes to multiple items within and across tables.
 
 > Caching
 
-DynamoDB accelerator (DAX) is a fully managed, clustered in-memory cache for DynamoDB. It improves response times for eventually consistent reads only. You point the API calls to the DAX cluster instead of your table. DAX cluster passes all requests to DynamoDB and doesn't cache for these requests. It's not suitable for apps requiring strongly consistent reads, or write intensive apps.
+DynamoDB accelerator (DAX) is a fully managed, clustered in-memory cache for DynamoDB. Only use it for eventually consistent reads. API calls are pointed to the DAX cluster instead of to the table, and it passes all requests to DynamoDB and doesn't cache for these requests.
 
-For backup, DynamoDB has 2 built-in backup methods: on-demand and point-in-time recovery, which provides continuous backups of the table data. When enabled, DynamoDB maintains incremental backups of your table for the last 35 days until you explicitly turn it off.
+> Backup
+
+On-demand and point-in-time recovery, which provides continuous backups of the table data. When enabled, DynamoDB maintains incremental backups of your table for the last 35 days until you explicitly turn it off.
 
 ### Elasticache
 
-Web service that makes it easy to deploy, operate and scale an in-memory cache in the cloud. It can be used to improve latency and throughput for many read-heavy apps or *compute-intensive* workloads. If the db is running many OLAP transactions, use Redshift. Redshift is not suitable for workloads that need to capture data, but it supports join operations. Elasticache can also be used to store session states.
+In-memory cache in the cloud, used to improve latency and throughput for many read-heavy or *compute-intensive* workloads, or to store session states. If the db is running many OLAP transactions, use Redshift. Redshift is not suitable for workloads that need to capture data, but it supports join operations.
 
-Types of Elasticache:
+> Types of Elasticache
 
-* Memcached: *simple* object caching system to offload a db, supports multithreaded performance using multiple cores. No multi-AZ capability, could have downtime
-* Redis: in-memory key-value store that supports sorted sets, lists, backup and restore. Use this if you want high availability, multi-AZ redundancy. AWS treats this more like a RDS, with sorting and ranking datasets in memory. Not highly durable
-* Redis cluster provide high availability and durability
+* *Memcached*: *simple* object caching system to offload a db, supports multithreaded performance using multiple cores. No multi-AZ capability, could have downtime
+* *Redis*: more complete, in-memory key-value store used for high availability, multi-AZ redundancy, but it's not highly durable. AWS treats this more like a RDS, with sorting and ranking datasets in memory. Redis cluster provide high availability and durability
 
-Strategies for caching:
+> Strategies for caching
 
 * **Lazy loading**: loads data into the cache only when data is requested. Good option when there's not much space. It can have cache miss penalty, and the data can get stale. If the data in the db changes, the cache doesn't automatically get updated
 * **Write through**: adds/updates data to the cache whenever data is written to the db. Data in the cache is never stale, but write penalty: every write involves a write to the cache and resources are wasted if the data is never read. Elasticache node failure means that data is missing until added or updated in the database
