@@ -1,56 +1,61 @@
 # AWS Certified developer associate
 
+Last edited: 2021 March 22
+
 * Courses: [Acloudguru](https://learn.acloud.guru/course/aws-certified-developer-associate/dashboard), [Udemy](https://www.udemy.com/course/aws-certified-solutions-architect-associate-exam/)
-* Practice exams: [Braincert (DVA-C01)](https://www.braincert.com/course/lecture/14950-AWS-Certified-Developer-Associate-June-2018-Practice-Exams/18335), [Udemy](https://www.udemy.com/course/aws-certified-developer-associate-practice-tests-dva-c01), [Whizlabs](https://www.whizlabs.com/aws-developer-associate/practice-tests/)
+* Practice exams: [Braincert (DVA-C01)](https://www.braincert.com/course/lecture/14950-AWS-Certified-Developer-Associate-June-2018-Practice-Exams/18335), [Udemy](https://www.udemy.com/course/aws-certified-developer-associate-practice-tests-dva-c01), [Whizlabs](https://www.whizlabs.com/aws-developer-associate/practice-tests), [ExamTopics](https://www.examtopics.com/exams/amazon/aws-certified-developer-associate)
 
 Table of contents
 
-- [AWS Certified developer associate](#aws-certified-developer-associate)
-  - [Compute](#compute)
-    - [EC2](#ec2)
-    - [ECS](#ecs)
-    - [Lambda](#lambda)
-  - [Monitoring](#monitoring)
-    - [Cloudwatch](#cloudwatch)
-    - [X-Ray](#x-ray)
-  - [Networking](#networking)
-  - [Security](#security)
-    - [IAM](#iam)
-    - [Cognito](#cognito)
-    - [STS](#sts)
-    - [Encryption](#encryption)
-    - [Systems manager](#systems-manager)
-    - [OpsWorks](#opsworks)
-  - [Notifications](#notifications)
-    - [SQS](#sqs)
-    - [SNS](#sns)
-    - [SES](#ses)
-    - [Kinesis](#kinesis)
-  - [Storage and databases](#storage-and-databases)
-    - [S3](#s3)
-    - [EBS](#ebs)
-    - [RDS](#rds)
-    - [Aurora](#aurora)
-    - [DynamoDB](#dynamodb)
-    - [Elasticache](#elasticache)
-  - [CloudFormation](#cloudformation)
-  - [Elastic beanstalk](#elastic-beanstalk)
-  - [Deployment](#deployment)
-  - [Amazon API Gateway](#amazon-api-gateway)
-  - [Developer tools](#developer-tools)
-    - [CodePipeline](#codepipeline)
-    - [CodeCommit](#codecommit)
-    - [CodeBuild](#codebuild)
-    - [CodeDeploy](#codedeploy)
+* [Compute](#compute)
+  * [EC2](#ec2)
+    * [EBS](#ebs)
+  * [ECS](#ecs)
+  * [Lambda](#lambda)
+* [Monitoring](#monitoring)
+  * [Cloudwatch](#cloudwatch)
+  * [X-Ray](#x-ray)
+* [Networking](#networking)
+* [Security](#security)
+  * [IAM](#iam)
+  * [Cognito](#cognito)
+  * [STS](#sts)
+  * [Encryption](#encryption)
+  * [Systems manager](#systems-manager)
+  * [OpsWorks](#opsworks)
+* [Notifications](#notifications)
+  * [SQS](#sqs)
+  * [SNS](#sns)
+  * [SES](#ses)
+  * [Kinesis](#kinesis)
+* [Storage and databases](#storage-and-databases)
+  * [S3](#s3)
+  * [RDS](#rds)
+  * [Aurora](#aurora)
+  * [DynamoDB](#dynamodb)
+  * [Elasticache](#elasticache)
+* [CloudFormation](#cloudformation)
+* [Elastic beanstalk](#elastic-beanstalk)
+* [Deployment](#deployment)
+* [Amazon API Gateway](#amazon-api-gateway)
+* [CI/CD](#cicd)
+  * [CodeCommit](#codecommit)
+  * [CodeBuild](#codebuild)
+  * [CodeDeploy](#codedeploy)
+  * [CodePipeline](#codepipeline)
 
 ## Compute
 
 ### EC2
 
 * By default, user data runs only during the boot cycle when the instance is first launched. And by default, scripts entered as user data have root user privileges for executing, so they don't need sudo command
-* Burstable performance instances, such as T3, T3a and T2, are designed to provide a baseline level of CPU performance with the ability to burst to a higher level when required by the workload. If your AWS account is less than 12 months old, you can use a t2.micro instance for free within certain usage limits
+* Burstable performance instances, such as T3, T3a and T2, are designed to provide a baseline level of CPU performance with the ability to burst to a higher level when the workload requires. If your AWS account is less than 12 months old, you can use a t2.micro instance for free within certain usage limits
 
-For reserving instances, you can reserve it for an AZ (zonal RI) or region (regional AI). Zonal RIs provide a capacity reservation but regional don't.
+For reserving instances, you can reserve it for an AZ or region. Zonal RIs provide a capacity reservation but regional don't. Reserved capacity can be shared with other AWS accounts or within an AWS Organization.
+
+For hibernated instances, the costs are only EBS storage and Elastic IP Address charges attached to the instance.
+
+To generate crash dump data files after an instance is problematic, use EC2: SendDiagnosticInterrupt API.
 
 EC2 only allows in-place or blue/green deployment. A placement group enables instances to interact with each other via high bandwidth, low latency connection.
 
@@ -68,10 +73,31 @@ aws ec2 monitor-instances --instance-ids i-1234567890abcdef0
 > Autoscaling
 
 * When creating from the console, only basic monitoring by default. When creating through CLI/SDK, detailed monitoring by default.
-* If one instance exceeds capacity, ASG creates a new one. If it's unhealthy, the AS group will terminate it first, and create a new one after
+* If one instance exceeds capacity or is unhealthy, the AS group will terminate it first, and create a new one after
 * ASGs attempt to distribute instances evenly between the AZs that are enabled for the ASG
 * ASG can contain EC2 instances in multiple AZs within the same region, and cannot span multiple regions
 * By querying the instance metadata, it's possible to get the private IP address of the instance.
+
+#### EBS
+
+Highly available (automatically replicated within a single AZ but *AZ locked*) and scalable storage volume that can be attached to the EC2 instance, but can't share data between instances. Upon launch of an instance, at least one EBS volume is attached to it.
+
+Snapshots are incremental and they span the region, which means they aren't in the same AZ as the volume. To make snapshots of many volumes, create a multi-volume snapshot and in Resource type, choose Instance. For a snapshot of just a volume, choose Resource type Volume.
+
+> Volume types
+
+* **gp2**: general purpose SSD, boot disks and general applications. the only option that can be a boot volume. up to 16k IOPS per volume
+* **io2**: provisioned IOPS SSD: higher IOPS, many read/writes per second. For large dbs, latency-sensitive workloads. highest performance option, most expensive
+  * The maximum ratio of provisioned IOPS to the requested volume size (in GB) is 50:1. For example, a 100GB volume can be provisioned witih up to 5000 IOPS
+* **st1**: throughput optimized HDD: for read-intensive workloads, for frequently accessed workloads that need to store mountains of data, big data, data warehouses
+* **sc1**: cold HDD: lowest cost option, workloads where performance isn't a factor
+
+> Encrpytion
+
+* EBS supports in-flight encryption and also at rest encryption using KMS
+* To encrypt a volume: create an encrypted snapshot of the volume, restore the volume from the encrypted snapshot, mount it
+* An encrypted EBS volume always creates an encrypted snapshot, which always creates an encrypted EBS volume
+* Encryption by default is a region-specific setting. If enabled for a region, it can't be disabled for individual volumes or snapshots in that region
 
 ### ECS
 
@@ -98,7 +124,7 @@ To reuse execution context, package only the modules the function requires and m
 
 Environment variables can't exceed 4KB, and you can use as many as you want. so if encrypted data must be passed to the function, use envelope encryption and reference the data as file within the code. Using an envelope encryption, the network load is much lower. For lower files, you can use Encryption SDK and pack the encrypted file with the Lambda function.
 
-For temporary storage that won't be necessary after the function finishes, use /tmp directory up to 512MB and delete the files at the end of the function.
+For temporary storage that won't be necessary after the function finishes, use /tmp directory up to 512MB and delete the files at the end of the function.  Use DynamoDB to store session data across functions
 
 A Publish version is a snapshopt copy of a function code and config in the latest version. Config can't be changed and it has a unique ARN which can't be modified.
 
@@ -181,7 +207,7 @@ To ensure that X-Ray daemon is correctly discovered in ECS, use the SDK AWS_XRAY
   - ALB request tracing: tracks HTTP requests. The LB adds a header with a trace identifier to each request it receives.
   - If the target groups have no registered targets, the error shown is HTTP 503.
   - THe ALB only sees the LB IP address, not the user's public IP. But it can obtain this by X-Forwarded-For header.
-  - Sticky sessions route requests to the same target in a target group. The clients must support cookies. Stickiness restricts app elasticity, it's not so scalable.
+  - Sticky sessions route requests to the same target in a target group. The clients must support cookies. Stickiness restricts app elasticity, it's not so scalable. And it's not fault-tolerant, sticky sessions are stored in an EC2 instance. If the instance fails, the LB will create another instance but the session information will be lost
   - If the app has no cookie management, let the LB generate a cookie for a specified duration
 * **NLB**, network load balancer: routes network packets, balance TCP traffic where extreme performance is required, handle millions of requests per second. Allows TCP passthrough. Cannot handle path based routing. They can capture the user's source IP address and source port without using X-Forwarded-For
 * Classic LB: load balance HTTP/HTTPS apps and user layer7 specific features, and also use strict layer4 load balancing for apps that rely purely on TCP protocol. If it returns 504, it means the gateway has timed out. The app might be failing in the web server or db server.
@@ -256,6 +282,7 @@ Web identity federation (WIF) allows users to authenticate with a WI provider (W
   - The user authenticates first with the Web ID provider and receives an authentication token, which is exchanged for tmp AWS credentials allowing them to assume an IAM role. 
 * Cognito **Sync**: cross device data sync without requiring your own backend
 * Cognito **streams**: control and insight into the data stored in Cognito. You can configure a kinesis stream to receive events as data is updated and synchronized. Cognito can push each dataset change to a Kinesis stream in real-time 
+* For MFA within Cognito, use Google Authenticator, or SMS text message with MFA code. Cognito Identity pool and SES not supported
 
 ### STS
 
@@ -290,31 +317,41 @@ OpsWorks is a config management service providing managed instances of Chef and 
 
 Highly-durable pull-based queue, useful for persist in-flight transactions. It has no strict ordering and might contain duplicates. To delete messages, a command is necessary, it's not automatic.
 
-**Visibility timeout**: amount of time that the message is invisible in the SQS after a reader picks up the message. Makes sure that the message isn't read by any other consumer while it's being processed by one. If the job isn't processed in that time, the msg becomse visible again and another reader will process it. Default timeout is 30s, can be increased up to 12h.
+**Visibility timeout**: amount of time that the message is invisible in the SQS after a reader picks up the message. Makes sure that the message isn't read by any other consumer while it's being processed by one. If the job isn't processed in that time, the message becomse visible again and another reader will process it. Default timeout is 30s, can be increased up to 12h.
 
-* Message size limit is 256kb. For larger messages, store the messages in S3 and use Amazon SQS extended client library for Java to manage them, and also the AWS SDK for Java.
+* Message size limit is 256KB. For larger messages, store the messages in S3 and use Amazon SQS extended client library for Java and the AWS SDK for Java to manage them
 * No message limits for storing in SQS, but max 120k 'in-flight messages' (received from a queue by a consumer, but not yet deleted from queue)
-* When retrieving messages from a queue, you can retrieve max 10 messages
-* Retention period default is 4 days, but you can increase the queue message retention up to 14 days with Set QueueAttributes action
+* Max 10 messages can be retrieved from a queue at once
+* Retention period default is 4 days, but can be increased up to 14 days with Set QueueAttributes action
 
 > Types of queues
 
 * **FIFO queue**: strict ordering, one-time processing and no duplicates. But limit of 300 messages/second. To ensure messages arrive in order, use the sequence info in the messages with Standard queues
 * **Delay queue**: postpone delivery of new messages when they're first added to the queue, default delay is 0s, max 900s. In this time, messages are invisible. For delaying individual messages rather than the entire queue, use message timers.
-* **Dead letter queue**: to prevent data loss, they sideline, isolate and alayze the unsucessfully procesed messages. Useful when the lambda function invocation is asynchronous and it fails all retry attempts, in which case the message sends it to the DLQ.
+* **Dead letter queue**: to prevent data loss, they sideline, isolate and alayze the unsucessfully procesed messages
+  - For standard queue, standard dead letter queue should be created. For FIFO, FIFO dead letter queue
+  - You should use the same AWS account to create the standard and dead letter queues
+  - Both queues should be in the same region
 
-If there are multiple senders, each sender's messages must be processed in order, by configuring each sender with a unique MessageGroupId, this is a flag that specifies that a message belongs to a specific message group. Messages that belong to a group are always processed one by one, in a strict order relative to the message group. For orders with different priorities, use 2 SQS queues
+Assigning a *MessageDuplicationID* to each message helps with deduplication. To ensure that messages are delivered in order, use *MessageGroupId*.
+
+If there are multiple senders, each sender's messages must be processed in order, by configuring each sender with a unique *MessageGroupId*, this is a flag that specifies that a message belongs to a specific message group. Messages that belong to a group are always processed one by one, in a strict order relative to the message group. For orders with different priorities, use 2 SQS queues.
+
+When using SNS and SQS, each queue receives an identical message sent to the topic instantaneously and can start processing messages independently of other queues.
 
 > Fetching from queue
 
 * Short polling: returns a response immediately. Some messages might not get received, because short polling doesn't return all messages. It has additional cost
-* Long polling: periodically poll the queue, response is returned only when a msg arrives or the long poll times out. Retrieves all messages. Can save money. To have the shortest delay, use `ReceiveMessageWaitTimeSeconds`. To reduce costs even more, group the SQS API operations in batches.
+* Long polling: periodically poll the queue, response is returned only when a msg arrives or the long poll times out. Retrieves all messages. Can save money
+  * To have the shortest delay, use `ReceiveMessageWaitTimeSeconds`
+  * To reduce costs, group the SQS API operations in batches
+  * To increase message performance, use a single thread to process a single queue using long polling.
 
 ### SNS
 
-* Push-based asynchronous simple notification service with durable storage to send notifications from the cloud
-* It can deliver push notifications, SMS and emails to any HTTP endpoint, and it can trigger a Lambda function. SES is not an endpoint. Can't receive anything
+* Push-based asynchronous simple notification service with durable storage to send notifications from the cloud. Can't receive anything
 * Pub-sub model (publish and subscribe). Apps can push msgs to a topic, and subscribers receive these from the topic. Consumers must subscribe to a topic to receive the notifications
+* It can deliver push notifications, SMS and emails to any HTTP endpoint, and it can trigger a Lambda function. SES is not an endpoint
 * Useful when sending a message and its metadata at the same time
 * SNS can be used in conjunction with SQS to fan a single message out to multiple SQS queues
 
@@ -326,17 +363,25 @@ Scalable and highly available email service. Pay as you go model, it send and re
 
 Family of services to analyze streaming data in real time.
 
+> Kinesis vs. SQS
+
+* Kinesis can process orders real-time
+* Kinesis can route data records to selected shards using a partition key
+* Kinesis queue can be replayed
+* Kinesis can maintain the order of log statements
+* Kinesis **cannot** track successful completion of each item independently
+
 > Shards
 
 * Streams are made of shards, each shard is a sequence of 1+ data records and provides a fixed unit of capacity
-* Default is 5reads/s, max 2MB. 1k writes/s, max is 1MB/s
+* Streams follows FIFO ordering, but there is no guarantee of order across shards
+* Default is 5reads/s, max 2MB/s. 1k writes/s, max is 1MB/s
 * Records can be consumed according to a sequence number applied when data is written to the Kinesis shard
 * For X shards, max X instances are allowed
 * To scale up processing in your app, increase instance size, increase \# instances to max \# open shards, and increase \# shards. The first two steps improve instances while shards run in parallel, the third increases the level of parallelism
 * One worker can process multiple shards. Resharding, increasing the number of shards, doesn't mean you need more instances
-* Order of data within a shard is guaranteed, but not across multiple shards
 
-The partition key is used by KDS to distribute data across shards, and it's used to determine the shards to which a given data record belongs. If this key is not distributed enough, all data is getting sent to a few shards and not leveraging the entire cluster of shards. Shards can get hot or cold, if they're receiving much data or too little.
+The partition key is used by KDS to distribute data across shards, and it's used to determine the shards to which a given data record belongs. If this key is not *distributed* enough, all data is getting sent to a few shards and not leveraging the entire cluster of shards. Shards can get hot or cold, if they're receiving too much data or too little.
 
 > Kinesis components
 
@@ -344,7 +389,7 @@ The partition key is used by KDS to distribute data across shards, and it's used
   * Strict ordering and duplicates, unlimited \# consumers
   * Allows KMS encryption for data at rest, and encryption in flight with HTTPS endpoint
   * With enhanced fanout, multiple users can retrieve data from a stream in parallel. Stream consumers can be registered to receive their own 2MB/s pipe of read throughput per shard, with an average message propagation delay of 70ms for all consumers
-* **Data firehose**: capture, transform, load streams into AWS data stores, when streamling directly into S3 for example. no analysis
+* **Data firehose**: capture, transform, load streams into AWS data stores, when streamling directly into S3 for example. can't do analysis
   - To encrypt data, enable encryption on firehose and ensure that kinesis streams are used to transfer data from the producers
   - Firehose allows Elasticsearch, Redshift and S3 as sink types. Not ElastiCache, since it's not a storage type
 * **Data analytics**: analyze, query and transform streamed data in real-time using standard SQL and save in an AWS data store
@@ -361,7 +406,8 @@ The partition key is used by KDS to distribute data across shards, and it's used
 
 * Max file size is 5GB. To upload larger files, use multi-part upload
 * Object locking for concurrent updates not supported
-* PUT is eventually consistent: when immediately listing the keys within a bucket after uploading a file, the object might not appear in the list
+* First-time PUTs are strongly consistent read-after-write
+* Overwrite PUT is eventually consistent: when immediately listing the keys within a bucket after uploading a file, the object might not appear in the list
 * DELETE is eventually consistent: when trying to read/list a recently deleted bucket, S3 might return the deleted data
 * To improve performance when many files are uploaded/downloaded, add a hash prefix to the folder or if all files are in the same folder, add the key prefix to the object
 * A sucessful upload results in a HTTP 200 result code and MD5 checksum
@@ -392,6 +438,7 @@ Encryption:
 * Server side encryption (SSE), protects data at rest. For example, a bucket policy that denies S3 PUT requests that don't include the SSE parameter in the request header
   * S3 managed keys (SSE-S3): a unique key encrypts each object, and the key itself is encrypted with a master key that is regularly rotated. It uses AES-256 for encryption. The header for a request with this encryption is: `s3:x-amz-server-side-encryption": "AES256`
   * AWS KMS managed keys (SSE-KMS), KMS manages *data* key, the customer *master* key can be customer managed or created by KMS directly. `s3:x-amz-server-side-encryption": "aws-kms`
+    - This might include latency with uploads/downloads, since the KMS API calls limit ir lower than the S3 limit
   * Server side encryption with customer provided keys (SSE-C): customer must manage the encryption key. No code necessary to encrypt or decrypt, only necessary to manage the encryption key you provide. In each API call, the customer needs to send the keys and encryption algorithm. For this situation, if the request is made over HTTP, S3 rejects it.
 * Client side encryption: used for encryption in transit via SSL/TLS
 
@@ -401,34 +448,7 @@ Encryption:
 
 > Cross-region
 
-To replicate a bucket in another region:
-
-1. Enable S3 bucket versioning
-2. Enable cross-origin resource sharing (CORS) on bucket2: a bucket1 from region A can access files from bucket2
-3. Bucket1 needs permission to replicate objects from bucket2
-
 CORS allows cross-origin access to S3 resources. To do this, create a CROS configuration with an XML doc with rules that identify the origins that you allow to access the bucket, the operations (HTTP methods) that will support for each origin.
-
-### EBS
-
-Highly available (automatically replicated within a single AZ but *AZ locked*) and scalable storage volume that can be attached to the EC2 instance, but can't share data between instances. Upon launch of an instance, at least one EBS volume is attached to it.
-
-Snapshots are incremental and they span the region, which means they aren't in the same AZ as the volume.
-
-> Volume types
-
-* **gp2**: general purpose SSD, boot disks and general applications. the only option that can be a boot volume. up to 16k IOPS per volume
-* **io2**: provisioned IOPS SSD: higher IOPS, many read/writes per second. For large dbs, latency-sensitive workloads. highest performance option, most expensive
-  * The maximum ratio of provisioned IOPS to the requested volume size (in GB) is 50:1. For example, a 100GB volume can be provisioned witih up to 5000 IOPS
-* **st1**: throughput optimized HDD: for read-intensive workloads, for frequently accessed workloads that need to store mountains of data, big data, data warehouses
-* **sc1**: cold HDD: lowest cost option, workloads where performance isn't a factor
-
-> Encrpytion
-
-* EBS supports in-flight encryption and also at rest encryption using KMS
-* To encrypt a volume: create an encrypted snapshot of the volume, restore the volume from the encrypted snapshot, mount it
-* An encrypted EBS volume always creates an encrypted snapshot, which always creates an encrypted EBS volume
-* Encryption by default is a region-specific setting. If enabled for a region, it can't be disabled for individual volumes or snapshots in that region
 
 ### RDS
 
@@ -517,42 +537,47 @@ In-memory cache in the cloud, used to improve latency and throughput for many re
 
 > Strategies for caching
 
-* **Lazy loading**: loads data into the cache only when data is requested. Good option when there's not much space. It can have cache miss penalty, and the data can get stale. If the data in the db changes, the cache doesn't automatically get updated
+* **Lazy loading/cache-aside**: loads data into the cache only when data is requested. Good option when there's not much space. It can have cache miss penalty, and the data can get stale. If the data in the db changes, the cache doesn't automatically get updated
 * **Write through**: adds/updates data to the cache whenever data is written to the db. Data in the cache is never stale, but write penalty: every write involves a write to the cache and resources are wasted if the data is never read. Elasticache node failure means that data is missing until added or updated in the database
 
 For backend caching, similar to write-through: write to backend, and then invalidate the cache. Then the caching engine fetches the latest value from the backend, so the backend and cache are in sync always.
 
 ## CloudFormation
 
-AWS resources defined in a YAML script. CF should be used for VP configs, security groups, LBs, deployment pipelines, IAM roles. Not to be used for DynamoDB tables, Kinesis streams, AutoScaling settings or S3 buckets. AWS SAM and Elastic Beanstalk rely on CF to provision resources.
+AWS resources defined in a YAML or JSON script. CF should be used for VP configs, security groups, LBs, deployment pipelines, IAM roles. Not to be used for DynamoDB tables, Kinesis streams, AutoScaling settings or S3 buckets. AWS SAM and Elastic Beanstalk rely on CF to provision resources.
 
-* **Transforms** required field. if this is used, it means the document is a SAM template
+* **Transforms** optional field: if used, it means the document is a SAM template
 * **Resources** required field. defines the resources and their properties
   * Can reference a nested stack, which must be previously saved in S3
-  * `!GetAtt` returns the value of an attribute from a resource in the template, can't receive inputs
-* **Conditions** section includes conditions that control whether certain resource properties are assigned a value during stack creation or update
-* **Parameters** to *pass values* such as passwords to the template at runtime. Does not allow conditions. Allows the data types of string, number and list.
-* **Mappings** of keys and values that can specify conditional parameter values
+  * `!GetAtt` returns the value of an attribute from a resource in the  template, can't receive inputs. It can return multiple attributes, for example the AvailabilityZone, PrivateDNSName of an EC2 instance
+* **Conditions** contains statements that define the circumstances under which entities are created or configured. For example, associate a condition with a resource or output so that CloudFormation only creates the resource or output if the condition is true
+* **Parameters** to *pass values* such as passwords to the template at runtime. Does not allow conditions. Allows the data types of string, number and list
+  - `!Ref` returns the default attribute of a parameter or a resource. For example, Ref returns only the InstanceID of an EC2 instance. 
+* **Mappings** of keys and values that can specify conditional parameter values, for example to map a region to an AMI.
   - `!FindInMap` returns the value corresponding to keys in a two-level map that is declared in this section
-* **Outputs** declares output values that you can import into other stacks, return in response or view on CF console. Use Export field for this
-  * With a cross-stack reference, owners of the web app stacks don't need to create or maintain networking rules or assets
-
-Intrinsic functions in templates are used to assign values to properties that aren't available until runtime. `Ref` returns the value of the specified parameter or resource, but cannot import values. It can accept input value from the user.
-
-If part of the CF deployment fails due to a misconfiguration, CF rollbacks the entire stack. If one of the resources in a stack can't be created, previously created resources get deleted and the stack creation terminates. Termination Protection stack option prevents accidental deletion of an entire CloudFormation stack.
-
-StackSets extend the functionality of stacks by enabling you to create, update or delete stacks across many accounts and regions.
-
-If Stack B and Stack C depend on Stack A, stack A must be deleted last. All imports must be removed before deleting the exporting stack. You can't delete Stack A first because it's being referenced in the other Stacks.
+* **Outputs** declares output values that you can import into other stacks, return in response or view on CF console. Use Export field
 
 To declare a Lambda function in CF, either upload the code as a zip to S3 and refer the object in AWS::Lambda::Function, or if the code is small and has no third-party dependencies, write the code inline in CF in the AWS::Lambda::Function block.
 
-CF change sets feature: helps check how changes to a CF template affect AWS resources before implementing the updated
+> Launch failure
+
+* If part of the CF deployment fails due to a misconfiguration, CF rollbacks the entire stack
+* If one of the resources in a stack can't be created, previously created resources get deleted and the stack creation terminates
+* Termination Protection stack option prevents accidental deletion of an entire CloudFormation stack.
+
+> Cross-stack
+
+* With a cross-stack reference, owners of the web app stacks don't need to create or maintain networking rules or assets
+* StackSets extend the functionality of stacks by enabling you to create, update or delete stacks across many accounts and regions.
+
+If Stack B and Stack C depend on Stack A, stack A must be deleted last. All imports must be removed before deleting the exporting stack. You can't delete Stack A first because it's being referenced in the other Stacks.
 
 > CLI commands:
 
-* `cloudformation package`: package the local artifacts that the CF template references. Uploads the local artifacts, like source code to Lambda
+* `cloudformation package`: package the local artifacts that the CF template references. Uploads the local artifacts to S3, like source code to Lambda
 * `cloudformation deploy`: deploys the specified CF template
+
+*CF change sets feature* helps check how changes to a CF template affect AWS resources before implementing the updated.
 
 > Serverless
 
@@ -562,7 +587,7 @@ SAM is the serverless application model, to define and provision serverless apps
 * AWS::Serverless::API: to create API gateway resources and methods that can be invoked through HTTPS endpoints
 * AWS::Serverless::Function: configuration to create a Lambda function 
 * AWS::Serverless::LayerVersion: to create Lambda layered function
-
+ 
 ## Elastic beanstalk
 
 Deploy and scale web apps, without provisioning underlying servers, LBs, security groups etc.. It supports the deployment of web apps from Docker. If the on-premise application doesn't use Docker and can't seem to find a relevant environment in Beanstalk, use Packer to create a custom platform.
@@ -581,7 +606,7 @@ Deploy and scale web apps, without provisioning underlying servers, LBs, securit
   * Define Load Balancers, Elasticache
   * Docker containers are supported
   * If the env must include custom software, create YAML with the required package names
-  * For RDS, reference externally and load with env variables
+  * For RDS, reference externally and load with env variables. This can only be done at env creation, it's not possible to disassociate the database of an existing app
 
 Other configurations
 
@@ -608,8 +633,8 @@ Whenever a new version is uploaded to Beanstalk, it creates an app version. If t
 
 It's a service to manage APIs at any scale. Users make a request to the API gateway, and this redirects the request to EC2, Lambda, etc. First of all a deployment must be created in API Gateway. When changing the API, redeploy it to an existing stage or to a new stage.
 
-* API caching can be enabled for popular requests, it caches responses from the endpoint for a specified TTL period. Default is 300s, max can be 3600. If it's 0, caching is disabled
-  * To invalidate caching, send header with Cache-Control: max-age=0
+* API caching can be enabled for popular requests, it caches responses from the endpoint for a specified TTL period. Default is 300s, max can be 3600s. If it's 0, caching is disabled
+  * *To invalidate caching, send header with Cache-Control: max-age=0*
 * Frontend: method, backend: integration
 * Docker is not supported
 * If a request is comming like an XML, the request and response data mapping template will map it to JSON
@@ -627,15 +652,9 @@ http://example.com/${stageVariables.<variable_name>}/prod
 * Lambda authorizer is a Lambda function controlling access to the API
 * API gateway can be throttled to prevent attacks
 
-## Developer tools
+## CI/CD
 
 CodeStar handles all aspects of development and deployment on AWS.
-
-### CodePipeline
-
-* Manages the whole workflow whenever a change is detected in the source code
-* If the pipeline needs needs approval, add a manual approval step at the end of the flow
-* If one stage of the pipeline fails, the entire process stops running
 
 ### CodeCommit
 
@@ -645,27 +664,44 @@ CodeStar handles all aspects of development and deployment on AWS.
 
 ### CodeBuild
 
-Automated build, runs tests, produce packages. The `buildspec.yml` file specifies the build configurations, should be in the root folder.
+Automates builds, runs tests, produce packages. The `buildspec.yml` file specifies the build configurations, should be in the root folder, or in an S3 bucket in the same region as that of the build project.
+
+It supports building a build from a source code located in CodeCommit, S3, Github or Bitbucket. EC2 instances and on-premise local machine are not valid locations.
 
 * It scales automatically to meet peak build requests
 * If the build fails, run it locally using CodeBuild Agent
-* For very big dependencies, bundle them all in the source coude during the last stage of CodeBuild, thus reducing the build time
-* Logs are in CloudWatch, they can be exported to S3
+* For very big dependencies, to reduce build time,, bundle them all in the source coude during the last stage of CodeBuild
+* Logs are stored in CloudWatch, they can be exported to S3
+* To override build commands without touching the code or editing the project, run the start build CLI command with buildspecOverride property to set the new buildspec.yml file
 
-To override build commands without touching the code or editing the project, run the start build CLI command with buildspecOverride property to set the new buildspec.yml file.
+For running dependencies before the build phase, specify run-as as the top of **pre_build** command of phases block.
+
+When using SAM in the build phase, use aws-sam-cli in the install phase and sam package in the post_build phase of the buildspec file.
 
 ### CodeDeploy
 
-Automated deployments to EC2, Lambda, or to on-premises. With a CodeDeploy agent in an EC2 instance, the instances can be used in Codedeploy deployments. The agent cleans up log files to conserve disk space. With Codedeploy deployment groups, EC2 instances are a set of individual instances targeted for deployment.
+* Automated deployments to EC2, Lambda, or to on-premises
+* With a CodeDeploy agent in an EC2 instance, the instances can be used in Codedeploy deployments. The agent cleans up log files to conserve disk space
+* With Codedeploy deployment groups, EC2 instances are a set of individual instances targeted for deployment
 
 > Steps: ApplicationStop --> BeforeInstall --> DownloadBundle --> AfterInstall -> ApplicationStart --> ValidateService (to verify success)
 
+While creating event hooks for blue/green deployment, the following events can have scripted files: ApplicationStop, BeforeInstall, AfterInstall, ApplicationStop, ValidateService, BeforeAllowTraffic, AfterAllowTraffic, BeforeBlockTraffic, AfterBlockTraffic. Not DownloadBundle, Block/AllowTraffic
+
 * `appspec.yml` is the deployment config file, it must be in the root folder
-  - When working with Lambda, specify the version in appspec.yml
+  - When working with Lambda, specify the version in this file
   - the hooks section determines the scripts that are run in the lifecycle event hooks
+
+To run tests before the deploy stage, to ensure there are no bugs in the code, create a job worker with access to the public endpoint for CodePipeline.
 
 > Rollback
 
 If the deployment fails, CodeDeploy first deploys to the failed instances. A new deployment of the last known working version is deployed with a new deployment ID.
 
 If the previous version's files are unreachable, they have to be manually added to the instance, or a new app revision must be created.
+
+### CodePipeline
+
+* Manages the whole workflow whenever a change is detected in the source code
+* If the pipeline needs needs approval, add a manual approval step at the end of the flow
+* If one stage of the pipeline fails, the entire process stops running
