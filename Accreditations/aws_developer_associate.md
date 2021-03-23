@@ -7,46 +7,46 @@ Last edited: 2021 March 22
 
 Table of contents
 
-* [Compute](#compute)
-  * [EC2](#ec2)
+* [1. Compute](#1-compute)
+  * [1.1. EC2](#11-ec2)
     * [EBS](#ebs)
-  * [ECS](#ecs)
-  * [Lambda](#lambda)
-* [Monitoring](#monitoring)
-  * [Cloudwatch](#cloudwatch)
-  * [X-Ray](#x-ray)
-* [Networking](#networking)
-* [Security](#security)
-  * [IAM](#iam)
-  * [Cognito](#cognito)
-  * [STS](#sts)
-  * [Encryption](#encryption)
-  * [Systems manager](#systems-manager)
-  * [OpsWorks](#opsworks)
-* [Notifications](#notifications)
-  * [SQS](#sqs)
-  * [SNS](#sns)
-  * [SES](#ses)
-  * [Kinesis](#kinesis)
-* [Storage and databases](#storage-and-databases)
-  * [S3](#s3)
-  * [RDS](#rds)
-  * [Aurora](#aurora)
-  * [DynamoDB](#dynamodb)
-  * [Elasticache](#elasticache)
-* [CloudFormation](#cloudformation)
-* [Elastic beanstalk](#elastic-beanstalk)
-* [Deployment](#deployment)
-* [Amazon API Gateway](#amazon-api-gateway)
-* [CI/CD](#cicd)
-  * [CodeCommit](#codecommit)
-  * [CodeBuild](#codebuild)
-  * [CodeDeploy](#codedeploy)
-  * [CodePipeline](#codepipeline)
+  * [1.2. ECS](#12-ecs)
+  * [1.3. Lambda](#13-lambda)
+* [2. Monitoring](#2-monitoring)
+  * [2.1. Cloudwatch](#21-cloudwatch)
+  * [2.2. X-Ray](#22-x-ray)
+* [3. Networking](#3-networking)
+* [4. Security](#4-security)
+  * [4.1. IAM](#41-iam)
+  * [4.2. Cognito](#42-cognito)
+  * [4.3. STS](#43-sts)
+  * [4.4. Encryption](#44-encryption)
+  * [4.5. Systems manager](#45-systems-manager)
+  * [4.6. OpsWorks](#46-opsworks)
+* [5. Notifications](#5-notifications)
+  * [5.1. SQS](#51-sqs)
+  * [5.2. SNS](#52-sns)
+  * [5.3. SES](#53-ses)
+  * [5.4. Kinesis](#54-kinesis)
+* [6. Storage and databases](#6-storage-and-databases)
+  * [6.1. S3](#61-s3)
+  * [6.2. RDS](#62-rds)
+  * [6.3. Aurora](#63-aurora)
+  * [6.4. DynamoDB](#64-dynamodb)
+  * [6.5. Elasticache](#65-elasticache)
+* [7. CloudFormation](#7-cloudformation)
+* [8. Elastic Beanstalk](#8-elastic-beanstalk)
+* [9. Deployment](#9-deployment)
+* [10. Amazon API Gateway](#10-amazon-api-gateway)
+* [11. CI/CD](#11-cicd)
+  * [11.1. CodeCommit](#111-codecommit)
+  * [11.2. CodeBuild](#112-codebuild)
+  * [11.3. CodeDeploy](#113-codedeploy)
+  * [11.4. CodePipeline](#114-codepipeline)
 
-## Compute
+## 1. Compute
 
-### EC2
+### 1.1. EC2
 
 * By default, user data runs only during the boot cycle when the instance is first launched. And by default, scripts entered as user data have root user privileges for executing, so they don't need sudo command
 * Burstable performance instances, such as T3, T3a and T2, are designed to provide a baseline level of CPU performance with the ability to burst to a higher level when the workload requires. If your AWS account is less than 12 months old, you can use a t2.micro instance for free within certain usage limits
@@ -61,7 +61,7 @@ EC2 only allows in-place or blue/green deployment. A placement group enables ins
 
 For detailed monitoring, install Cloudwatch agent on the machine and then configure it to send the server's logs to a central location in Cloudwatch.
 
-AWS Data Pipeline automates data movement and transformation. It can transfer logs or other data from EC2 instances to S3 buckets.
+AWS *Data Pipeline* automates data movement and transformation. It can transfer logs or other data from EC2 instances to S3 buckets.
 
 ```bash
 # launch an instance while enabling detaile dmonitoring
@@ -94,37 +94,37 @@ Snapshots are incremental and they span the region, which means they aren't in t
 
 > Encrpytion
 
-* EBS supports in-flight encryption and also at rest encryption using KMS
+* EBS supports in-flight encryption and also at-rest encryption using KMS
 * To encrypt a volume: create an encrypted snapshot of the volume, restore the volume from the encrypted snapshot, mount it
 * An encrypted EBS volume always creates an encrypted snapshot, which always creates an encrypted EBS volume
 * Encryption by default is a region-specific setting. If enabled for a region, it can't be disabled for individual volumes or snapshots in that region
 
-### ECS
+### 1.2. ECS
 
-A scalable container orchestration service supporting docker. It uses Fargate for serverless, or you can use EC2 for more control. First upload the image to ECR, elastic container registry. ECS connects to ECR and deploys the images.
+A scalable container orchestration service supporting Docker. For serverless use Fargate, for more control use EC2. First upload the image to ECR, elastic container registry. ECS connects to ECR and deploys the images.
 
 To log in, run `aws ecr get-login`, use the output to login to ECR, and then pull the image with `docker pull REPOSITORY URI : TAG`
 
-* To allow the container to access SQS, the policy must be attached to the ECS Task's execution role
+* To allow the container to access SQS, the policy must be attached to the ECS **Task**'s execution role
 * To use X-Ray with ECS, create a separate Docker image to run the X-Ray daemon, add instrumentation to the app code for X-Ray and configure and use an IAM role for tasks.
 * If the container should share storage, use Fargate launch
 * When you use ECS with a load balancer deployed across multiple AZs, you get a scalable and highly available REST API.
 
-### Lambda
+### 1.3. Lambda
 
 Lambda is priced based on number of requests (first 1M free, then $0.2 per 1M requests) and duration. Lambda automatically scales out, not up.
 
 > Function
 
-With an alias you can create many versions of Lambda functions. `$LATEST` is always the last version of code you uploaded to Lambda. Use Lambda versioning and aliases to point the apps to a specific version if you don't want to use `$LATEST`. If the app has an alias instead of `$LATEST`, it won't automatically use new code when you upload it. `$LATEST` can't be configured in an ARN, use Alias instead.
-
-With aliases, you can route some traffic to the new Lambda version.
+With an alias you can create many versions of Lambda functions. `$LATEST` is always the last version of code you uploaded to Lambda. Use Lambda versioning and aliases to point the apps to a specific version if you don't want to use `$LATEST`. If the app has an alias instead of `$LATEST`, it won't automatically use new code when you upload it. `$LATEST` can't be configured in an ARN, use Alias instead. Aliases can be used to route some traffic to different Lambda versions.
 
 To reuse execution context, package only the modules the function requires and move the initialization of the RDS connection outside the handler function. To avoid hard-coding information, use environment variables.
 
-Environment variables can't exceed 4KB, and you can use as many as you want. so if encrypted data must be passed to the function, use envelope encryption and reference the data as file within the code. Using an envelope encryption, the network load is much lower. For lower files, you can use Encryption SDK and pack the encrypted file with the Lambda function.
+Environment variables can't exceed 4KB, and you can use as many as you want. so if encrypted data must be passed to the function, use envelope encryption and reference the *data as file* within the code. For smaller files, you can use Encryption SDK and pack the encrypted file with the Lambda function.
 
-For temporary storage that won't be necessary after the function finishes, use /tmp directory up to 512MB and delete the files at the end of the function.  Use DynamoDB to store session data across functions
+To improve startup time, include the dependencies in the deployment package along with the code.
+
+For temporary storage that won't be necessary after the function finishes, use /tmp directory up to 512MB and delete the files at the end of the function.  Use DynamoDB to store session data across functions.
 
 A Publish version is a snapshopt copy of a function code and config in the latest version. Config can't be changed and it has a unique ARN which can't be modified.
 
@@ -133,48 +133,45 @@ A Publish version is a snapshopt copy of a function code and config in the lates
 * Maximum execution duration for a Lambda request is 900s=15mins
 * The maximum deployment package size is 50MB, and the max size of code/dependencies zipped into a deployment package is 250MB
 * Lambda has a limit to the number of functions that can run simultaneously in a region. Default is 1000 per second per region, the error you get is `TooManyRequestsException`, HTTP status code 429. Avoid recursion!
-* Maximum RAM is 10GB
-
-Make sure the dependencies are included in the deployment package, along with the code, to improve startup time 
+* **Maximum RAM is 10GB**
 
 > Monitoring and security
 
-With **step functions** you can visualize serverless applications, they automatically trigger and track each step so if something goes wrong you can track what went wrong where. With step functions you can track flows executed by Lambda functions, and you can control multiple Lambda functions. With Step functions state machines you can orchestrate the workflow
+With **step functions** you can visualize serverless applications, they automatically trigger and track each step so if something goes wrong you can track what went wrong where. With step functions you can track flows executed by Lambda functions, and you can control multiple Lambda functions. With Step functions state machines you can orchestrate the workflow.
 
 With Lambda authorizer, a 3rd party authorization mechanism is used to invoke the Lambda function.
 
-Lambda works on S3 events asynchronously and for asynchronous invocations, Lambda retries function errors twice. If the retries fail, you can use dead letter queues to direct unprocessed events to an SQS queue.
+Lambda works on S3 events asynchronously and for asynchronous invocations, Lambda retries function errors twice. If the retries fail, direct unprocessed events to a dead-letter SQS queue.
 
 > Concurrency: \# requests that a Lambda function is serving at a time.
 
-If a function is invoked while a request is still undergoing, another instance is allocated, increasing the functions' concurrency. Reaching the concurrency limit leads to latency bottlenecks. To enable the function to scale without fluctuations in latency, use provisioned concurrency. By allocationg this before an increase in invocations, you can ensure that all requests are served by initialized instances with very low latency. You can also configure application auto scaling to manage provisioned concurrency on a schedule or based on use. To increase provisioned concurrency automatically as needed, use the app auto scaling API to register a target and create a scaling policy.
+If a function is invoked while a request is still undergoing, another instance is allocated, increasing the functions' concurrency. Reaching the concurrency limit leads to latency bottlenecks. To enable the function to scale without fluctuations in latency, use *provisioned* concurrency. By allocationg this before an increase in invocations, you can ensure that all requests are served by initialized instances with very low latency. You can also configure application auto scaling to manage provisioned concurrency on a schedule or based on use. To increase provisioned concurrency automatically as needed, use the app auto scaling API to register a target and create a scaling policy.
 
-You can set up reserved concurrency for the Lambda function so that it throttles if it goes above a certain concurrency limit. This is used to limit the maximum concurrency for a given Lambda function.
+You can set up *reserved* concurrency for the Lambda function so that it throttles if it goes above a certain concurrency limit. This is used to limit the maximum concurrency for a given Lambda function.
 
 If Lambda is working with Kinesis data streams, it works synchronously. If it encounters errors, it doesn't proceed execution and retries until the error is resolved or the data expired.
 
 Lambda & X-Ray, no need to install daemon in Lambda. Only the IAM role assigned to Lambda should have access to X-Ray.
 
-## Monitoring
+## 2. Monitoring
 
-* CloudTrail: monitors API calls in the AWS platform. Logs all authenticated API requests to IAM and STS APIs.
+* CloudTrail: monitors API calls in the AWS platform. Logs all authenticated API requests to IAM and STS APIs
 * AWS config records the state of your AWS env and can notify you of changes
 * AWS Budgets needs approximately 5 weeks of usage data to generate budget forecasts
 
-### Cloudwatch
+### 2.1. Cloudwatch
 
 * host level metrics: CPU, network, disk and status check
 * Custom metrics: can be used for RAM, \# logged-in users. Min 1min granularity
 * By default, Cloudwatch stores the log data indefinitely, but you can change the retention
 * CloudWatch metrics: they tell the rate at which the function/code is executing, but can't help with debugging the error
-* Cloudwatch logs: Lambda pushes all logs to CW Logs 
 * You can retrieve data from any terminated instance after its termination
 * For alarms that should be triggered only if it breaches 2 evaluation periods, set data points to alarm as 2 while creating the alarm
 * CloudWatch integration feature with S3 allows to export log data from CW log groups to S3
 * *Cloudwatch events*: when the AWS environment changes, AWS resources can be triggered. You can create custom events or events generated periodically.
 * Log group data is always encrypted in CloudWatch logs, with the optional choice of using KMS for this encryption with the customer master key with the CLI command `associate-kms-key`
 
-### X-Ray
+### 2.2. X-Ray
 
 Prerequisites: install X-Ray daemon in the instance, create IAM role, give X-Ray permission: xray:PutTraceSegments and xray:PutTelemetryRecords and instrument the app with daemon and SDK.
 
@@ -196,21 +193,21 @@ X-Ray integrates with ELBs, Lambda and API gateway. Provides:
 
 To ensure that X-Ray daemon is correctly discovered in ECS, use the SDK AWS_XRAY_DAEMON_ADDRESS env variable.
 
-## Networking
+## 3. Networking
 
 4xx errors are due to missing required parameters in a request, or exceeding a DB table's provisioned throughput. 5xx errors are due to unavailable services, or network issues.
 
 > Elastic load balancer, ELB
 
-* **ALB**, application load balancer: proxies HTTP and HTTPS requests. Slightly slower than NLB, and doesn't scale quickly. with host/path based routing, it can handle multiple domains. It doesn't support TCP passthrough
+* **ALB**, application load balancer: proxies HTTP and HTTPS requests. Slightly slower than NLB, doesn't scale quickly. with host/path based routing, it can handle multiple domains. It doesn't support TCP passthrough
   - ALB access logs: detailed info about requests sent to the LB. Each log contains the time the request was received, the client's IP address, latencies, request paths, server responses and API connections
-  - ALB request tracing: tracks HTTP requests. The LB adds a header with a trace identifier to each request it receives.
-  - If the target groups have no registered targets, the error shown is HTTP 503.
-  - THe ALB only sees the LB IP address, not the user's public IP. But it can obtain this by X-Forwarded-For header.
+  - ALB request tracing: tracks HTTP requests. The LB adds a header with a trace identifier to each request it receives
+  - If the target groups have no registered targets, the error shown is HTTP 503
   - Sticky sessions route requests to the same target in a target group. The clients must support cookies. Stickiness restricts app elasticity, it's not so scalable. And it's not fault-tolerant, sticky sessions are stored in an EC2 instance. If the instance fails, the LB will create another instance but the session information will be lost
   - If the app has no cookie management, let the LB generate a cookie for a specified duration
-* **NLB**, network load balancer: routes network packets, balance TCP traffic where extreme performance is required, handle millions of requests per second. Allows TCP passthrough. Cannot handle path based routing. They can capture the user's source IP address and source port without using X-Forwarded-For
-* Classic LB: load balance HTTP/HTTPS apps and user layer7 specific features, and also use strict layer4 load balancing for apps that rely purely on TCP protocol. If it returns 504, it means the gateway has timed out. The app might be failing in the web server or db server.
+* **NLB**, network load balancer: routes network packets, balance TCP traffic where extreme performance is required, handle millions of requests per second. Allows TCP passthrough. Cannot handle path based routing.
+
+User's source IP Address can be captured with the headerX-Forwarded-For
 
 If users lose session or need to re-authenticate often, use ElastiCache Cluster, which provides a shared data storage for sessions that can be accessed from any individual web server.
 
@@ -234,7 +231,7 @@ A VPC doesn't connect directly to an Internet gateway, it connects to a Nat Gate
 
 Used to configure SSL/TLS certificates on an ALB; use IAM when the region is not supported by ACM.
 
-## Security
+## 4. Security
 
 * Key pairs: public and private keys, used to access Linux servers
   - Need root access for CloudFront key pairs
@@ -242,7 +239,7 @@ Used to configure SSL/TLS certificates on an ALB; use IAM when the region is not
 
 To avoid data leaks and identify security weaknesses, try SQL injections, penetration tests (with AWS approval) and hardening tests. Code checks only check performance issues.
 
-### IAM
+### 4.1. IAM
 
 With policies, all requests are denied by default. An explicit allow overrides a default deny and an explicit deny overrides an explicit allow.
 
@@ -273,7 +270,7 @@ Used to delegate access to resources that are in different AWS accounts by using
 * To check unused IAM roles, use Access advisor feature on IAM console
 * *IAM access analyzer* lets you see AWS resources that are shared with an external entity, it lets you identify unintended access to your resources and data.
 
-### Cognito
+### 4.2. Cognito
 
 Web identity federation (WIF) allows users to authenticate with a WI provider (WIP): Google, Facebook, Amazon. Cognito works with MFA authentication.
 
@@ -281,21 +278,21 @@ Web identity federation (WIF) allows users to authenticate with a WI provider (W
 * Cognito **identity pools**: gives users access to AWS resources, like S3 or DynamoDB. Generates temporary credentials for unauthenticated, unique and trusted users
   - The user authenticates first with the Web ID provider and receives an authentication token, which is exchanged for tmp AWS credentials allowing them to assume an IAM role. 
 * Cognito **Sync**: cross device data sync without requiring your own backend
-* Cognito **streams**: control and insight into the data stored in Cognito. You can configure a kinesis stream to receive events as data is updated and synchronized. Cognito can push each dataset change to a Kinesis stream in real-time 
+* Cognito **streams**: control and insight into the data stored in Cognito. A Kinesis stream can be configured to receive events as data is updated and synchronized. Cognito can push each dataset change to a Kinesis stream in real-time
 * For MFA within Cognito, use Google Authenticator, or SMS text message with MFA code. Cognito Identity pool and SES not supported
 
-### STS
+### 4.3. STS
 
 Security token service: used to request *temporary* (expire after 1h), limited-privilege credentials for IAM users or for users you authenticate. Not supported by API gateway for authentication.
 
-If an encoded authorization message is received when accessing an AWS resource, use STS decode-authorization-message
+If an encoded authorization message is received when accessing an AWS resource, use STS decode-authorization-message.
 
 * `AssumeRoleWithWebIdentity` allows users who have authenticated with a WIP to access AWS resources. If successful, STS returns temporary credentials
 * `AssumedRoleUser` ARN and `AssumedRoleID` are used to programatically retrieve the identifiers for the temporary security credentials. 
 
-### Encryption
+### 4.4. Encryption
 
-* **KMS** (key management service) is used to create and store encryption keys. KMS encryption keys are regional and can encrypt up to 4KB of data. For bigger keys, use envelope encryption.
+* **KMS** (key management service) is used to create and store encryption keys. KMS encryption keys are regional and can encrypt up to 4KB of data. For bigger keys, use envelope encryption
 * CMK (customer master key) is used for data keys
 * Envelope encryption
   * First the data is encrypted using a plaintext Data key
@@ -303,21 +300,21 @@ If an encoded authorization message is received when accessing an AWS resource, 
   * This way, only the data key goes over the network, not the data itself
   * This method requires code changes
 
-### Systems manager
+### 4.5. Systems manager
 
-SSM Parameter Store is storage for config data management and secrets management, to manage configs outside of EC2, or EBS. They can be loaded dynamically into the app at runtime
+SSM Parameter Store is storage for config data management and secrets management, to manage configs outside of EC2, or EBS. They can be loaded dynamically into the app at runtime.
 
-### OpsWorks
+### 4.6. OpsWorks
 
 OpsWorks is a config management service providing managed instances of Chef and Puppet, which are automation platforms allowing the use of code to automate the configs of servers.
 
-## Notifications
+## 5. Notifications
 
-### SQS
+### 5.1. SQS
 
 Highly-durable pull-based queue, useful for persist in-flight transactions. It has no strict ordering and might contain duplicates. To delete messages, a command is necessary, it's not automatic.
 
-**Visibility timeout**: amount of time that the message is invisible in the SQS after a reader picks up the message. Makes sure that the message isn't read by any other consumer while it's being processed by one. If the job isn't processed in that time, the message becomse visible again and another reader will process it. Default timeout is 30s, can be increased up to 12h.
+**Visibility timeout**: amount of time that the message is invisible in the SQS after a reader picks up the message. Ensures that the message isn't read by any other consumer while it's being processed by one. If the job isn't processed in that time, the message becomes visible again and another reader will process it. Default timeout is 30s, can be increased up to 12h.
 
 * Message size limit is 256KB. For larger messages, store the messages in S3 and use Amazon SQS extended client library for Java and the AWS SDK for Java to manage them
 * No message limits for storing in SQS, but max 120k 'in-flight messages' (received from a queue by a consumer, but not yet deleted from queue)
@@ -327,15 +324,15 @@ Highly-durable pull-based queue, useful for persist in-flight transactions. It h
 > Types of queues
 
 * **FIFO queue**: strict ordering, one-time processing and no duplicates. But limit of 300 messages/second. To ensure messages arrive in order, use the sequence info in the messages with Standard queues
-* **Delay queue**: postpone delivery of new messages when they're first added to the queue, default delay is 0s, max 900s. In this time, messages are invisible. For delaying individual messages rather than the entire queue, use message timers.
+* **Delay queue**: postpone delivery of new messages when they're first added to the queue, default delay is 0s, max 900s. In this time, messages are invisible. For delaying individual messages rather than the entire queue, use message timers
 * **Dead letter queue**: to prevent data loss, they sideline, isolate and alayze the unsucessfully procesed messages
   - For standard queue, standard dead letter queue should be created. For FIFO, FIFO dead letter queue
   - You should use the same AWS account to create the standard and dead letter queues
   - Both queues should be in the same region
 
-Assigning a *MessageDuplicationID* to each message helps with deduplication. To ensure that messages are delivered in order, use *MessageGroupId*.
+Assigning a *MessageDuplicationID* to each message helps with deduplication. To ensure that messages are delivered in order, use *MessageGroupID*.
 
-If there are multiple senders, each sender's messages must be processed in order, by configuring each sender with a unique *MessageGroupId*, this is a flag that specifies that a message belongs to a specific message group. Messages that belong to a group are always processed one by one, in a strict order relative to the message group. For orders with different priorities, use 2 SQS queues.
+If there are multiple senders, each sender's messages must be processed in order, by configuring each sender with a unique *MessageGroupID*, this is a flag that specifies that a message belongs to a specific message group. Messages that belong to a group are always processed one by one, in a strict order relative to the message group. For orders with different priorities, use 2 SQS queues.
 
 When using SNS and SQS, each queue receives an identical message sent to the topic instantaneously and can start processing messages independently of other queues.
 
@@ -345,9 +342,9 @@ When using SNS and SQS, each queue receives an identical message sent to the top
 * Long polling: periodically poll the queue, response is returned only when a msg arrives or the long poll times out. Retrieves all messages. Can save money
   * To have the shortest delay, use `ReceiveMessageWaitTimeSeconds`
   * To reduce costs, group the SQS API operations in batches
-  * To increase message performance, use a single thread to process a single queue using long polling.
+  * To increase message performance, use a single thread to process a single queue using long polling
 
-### SNS
+### 5.2. SNS
 
 * Push-based asynchronous simple notification service with durable storage to send notifications from the cloud. Can't receive anything
 * Pub-sub model (publish and subscribe). Apps can push msgs to a topic, and subscribers receive these from the topic. Consumers must subscribe to a topic to receive the notifications
@@ -355,11 +352,11 @@ When using SNS and SQS, each queue receives an identical message sent to the top
 * Useful when sending a message and its metadata at the same time
 * SNS can be used in conjunction with SQS to fan a single message out to multiple SQS queues
 
-### SES
+### 5.3. SES
 
 Scalable and highly available email service. Pay as you go model, it send and receive emails. It can trigger SNS and Lambda. It can be used for automated emails, online purchases, marketing emails. SES is not a valid target for CloudWatch Events.
 
-### Kinesis
+### 5.4. Kinesis
 
 Family of services to analyze streaming data in real time.
 
@@ -394,9 +391,9 @@ The partition key is used by KDS to distribute data across shards, and it's used
   - Firehose allows Elasticsearch, Redshift and S3 as sink types. Not ElastiCache, since it's not a storage type
 * **Data analytics**: analyze, query and transform streamed data in real-time using standard SQL and save in an AWS data store
 
-## Storage and databases
+## 6. Storage and databases
 
-### S3
+### 6.1. S3
 
 * Serverless storage service, best suited for objects and BLOB (binary large object) data
 * Pricing is for every TB for month
@@ -450,7 +447,7 @@ Encryption:
 
 CORS allows cross-origin access to S3 resources. To do this, create a CROS configuration with an XML doc with rules that identify the origins that you allow to access the bucket, the operations (HTTP methods) that will support for each origin.
 
-### RDS
+### 6.2. RDS
 
 Highly available, fault tolereant SQL-type database solution. Primary host in one AZ handles all traffic, and replicates to the secondary host in another AZ in a *synchronous* manner: a write to the primary host is written to the secondary host. The secondary host doesn't handle traffic.
 
@@ -468,7 +465,7 @@ RDS are monolithic, they have very coupled layers, if one is slow they are all s
 * Up to 5 read replicas can be created
 * To access it, use the DNS endpoint
 
-### Aurora
+### 6.3. Aurora
 
 Aurora is a self-healing cloud optimized relational db, distributed and elastic: it breaks apart the monolithic stack to enable a db that can scale out.
 
@@ -476,7 +473,7 @@ Aurora moves out the logging and storage layers of the db into a multi tented, s
 
 Aurora is not serverless by default, but can be made serverless.
 
-### DynamoDB
+### 6.4. DynamoDB
 
 Non-relational serverless db stored on SSD, spread across 3 geographically distinct data centers, immediately consistent and highly durable. Can be used for web sessions, JSON docs, and metadata for S3 objects, scalable session handling.
 
@@ -502,6 +499,8 @@ An item can have more than one attributes. The primary key can be single key (pa
 
 A local secondary index can only be created at the time of table creation, but a global secondary index can be created at at any time. Local indexes are immediately consistent but once you create them, all records sharing the same partition key need to fit in 10GB. Global indexes don't constrain your table size in any way, but reading from them is eventually consistent.
 
+Global secondary index is created when a query on non-partition keys will happen frequently. It speeds up queries on non-key attributes. Every GSI must have a partition key, and can have a sort key.
+
 LSIs and GSIs can coexist. LSIs use the RCU and WCU of the main table, which can't be changed. GSIs are stored in their own partition space away from the base table, and scale separately from the base table.
 
 > Queries
@@ -526,13 +525,13 @@ DynamoDB accelerator (DAX) is a fully managed, clustered in-memory cache for Dyn
 
 On-demand and point-in-time recovery, which provides continuous backups of the table data. When enabled, DynamoDB maintains incremental backups of your table for the last 35 days until you explicitly turn it off.
 
-### Elasticache
+### 6.5. Elasticache
 
 In-memory cache in the cloud, used to improve latency and throughput for many read-heavy or *compute-intensive* workloads, or to store session states. If the db is running many OLAP transactions, use Redshift. Redshift is not suitable for workloads that need to capture data, but it supports join operations.
 
 > Types of Elasticache
 
-* *Memcached*: *simple* object caching system to offload a db, supports multithreaded performance using multiple cores. No multi-AZ capability, could have downtime
+* *Memcached*: *simple* object caching system to offload a db, supports multithreaded performance using multiple cores. No multi-AZ capability, could have downtime, highly durable
 * *Redis*: more complete, in-memory key-value store used for high availability, multi-AZ redundancy, but it's not highly durable. AWS treats this more like a RDS, with sorting and ranking datasets in memory. Redis cluster provide high availability and durability
 
 > Strategies for caching
@@ -542,7 +541,7 @@ In-memory cache in the cloud, used to improve latency and throughput for many re
 
 For backend caching, similar to write-through: write to backend, and then invalidate the cache. Then the caching engine fetches the latest value from the backend, so the backend and cache are in sync always.
 
-## CloudFormation
+## 7. CloudFormation
 
 AWS resources defined in a YAML or JSON script. CF should be used for VP configs, security groups, LBs, deployment pipelines, IAM roles. Not to be used for DynamoDB tables, Kinesis streams, AutoScaling settings or S3 buckets. AWS SAM and Elastic Beanstalk rely on CF to provision resources.
 
@@ -588,7 +587,7 @@ SAM is the serverless application model, to define and provision serverless apps
 * AWS::Serverless::Function: configuration to create a Lambda function 
 * AWS::Serverless::LayerVersion: to create Lambda layered function
  
-## Elastic beanstalk
+## 8. Elastic Beanstalk
 
 Deploy and scale web apps, without provisioning underlying servers, LBs, security groups etc.. It supports the deployment of web apps from Docker. If the on-premise application doesn't use Docker and can't seem to find a relevant environment in Beanstalk, use Packer to create a custom platform.
 
@@ -604,7 +603,6 @@ Deploy and scale web apps, without provisioning underlying servers, LBs, securit
 * `.ebextensions/`, environment customization with configuration files
   * Files must be YAML/JSON and have `.config` extension
   * Define Load Balancers, Elasticache
-  * Docker containers are supported
   * If the env must include custom software, create YAML with the required package names
   * For RDS, reference externally and load with env variables. This can only be done at env creation, it's not possible to disassociate the database of an existing app
 
@@ -616,7 +614,7 @@ Other configurations
 
 Whenever a new version is uploaded to Beanstalk, it creates an app version. If the older ones aren't deleted, eventually the app version limit is reached. This can be avoided by applying an application version lifecycle to the apps. This tells Beanstalk to delete old app versions or to delete app versions when the total \# versions for an app exceeds a number
 
-## Deployment
+## 9. Deployment
 
 | Deployment type | Speed | Downtime | Availability reduction | Deploy to | Rollback | Cost |
 |-|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -629,7 +627,7 @@ Whenever a new version is uploaded to Beanstalk, it creates an app version. If t
 * Blue/green: new environment, new LB but using the same autoscaling group (or weighted routing policy in Route 53). The switch is performed at DNS level routing the traffic from the old env to the new when the new env is ready and healthy. Instant complete switch from old to new version
 * Immutable: same environment, same LB but new autoscaling group. From the moment a new instance is created, it serves traffic. When the new instances are all healthy, switch off the old ones.
 
-## Amazon API Gateway
+## 10. Amazon API Gateway
 
 It's a service to manage APIs at any scale. Users make a request to the API gateway, and this redirects the request to EC2, Lambda, etc. First of all a deployment must be created in API Gateway. When changing the API, redeploy it to an existing stage or to a new stage.
 
@@ -647,22 +645,22 @@ http://example.com/${stageVariables.<variable_name>}/prod
 
 > Security
 
-* For access from different domains, use CORS: Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Origin. It can also be used to deny cross-domain access.
+* For access from different domains, use CORS: Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Origin. It can also be used to deny cross-domain access
 * To deny specific IP addresses from accessing API Gateway, use WAF or resource policies
 * Lambda authorizer is a Lambda function controlling access to the API
 * API gateway can be throttled to prevent attacks
 
-## CI/CD
+## 11. CI/CD
 
 CodeStar handles all aspects of development and deployment on AWS.
 
-### CodeCommit
+### 11.1. CodeCommit
 
 * Source and version control
 * Allows access through git credentials, SSH keys and AWS access keys, not through IAM username and password. Create Git credentials for IAM users and allow the devs to connect via HTTPS using these credentials
 * Repositories are automatically encrypted at rest
 
-### CodeBuild
+### 11.2. CodeBuild
 
 Automates builds, runs tests, produce packages. The `buildspec.yml` file specifies the build configurations, should be in the root folder, or in an S3 bucket in the same region as that of the build project.
 
@@ -670,15 +668,14 @@ It supports building a build from a source code located in CodeCommit, S3, Githu
 
 * It scales automatically to meet peak build requests
 * If the build fails, run it locally using CodeBuild Agent
-* For very big dependencies, to reduce build time,, bundle them all in the source coude during the last stage of CodeBuild
-* Logs are stored in CloudWatch, they can be exported to S3
-* To override build commands without touching the code or editing the project, run the start build CLI command with buildspecOverride property to set the new buildspec.yml file
+* For very big dependencies, to reduce build time, bundle them all in the source coude during the last stage of CodeBuild
+* To override build commands without touching the code or editing the project, run the start build CLI command with `buildspecOverride` property to set the new buildspec.yml file
 
 For running dependencies before the build phase, specify run-as as the top of **pre_build** command of phases block.
 
-When using SAM in the build phase, use aws-sam-cli in the install phase and sam package in the post_build phase of the buildspec file.
+When using SAM in the build phase, use `aws-sam-cli` in the install phase and `sam package` in the post_build phase of the buildspec file.
 
-### CodeDeploy
+### 11.3. CodeDeploy
 
 * Automated deployments to EC2, Lambda, or to on-premises
 * With a CodeDeploy agent in an EC2 instance, the instances can be used in Codedeploy deployments. The agent cleans up log files to conserve disk space
@@ -700,8 +697,8 @@ If the deployment fails, CodeDeploy first deploys to the failed instances. A new
 
 If the previous version's files are unreachable, they have to be manually added to the instance, or a new app revision must be created.
 
-### CodePipeline
+### 11.4. CodePipeline
 
 * Manages the whole workflow whenever a change is detected in the source code
-* If the pipeline needs needs approval, add a manual approval step at the end of the flow
+* If the pipeline needs approval, add a manual approval step at the end of the flow. Not at every step of the pipeline
 * If one stage of the pipeline fails, the entire process stops running
