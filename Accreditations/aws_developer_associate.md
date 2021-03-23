@@ -1,6 +1,6 @@
 # AWS Certified developer associate
 
-Last edited: 2021 March 22
+Last edited: 2021 March 23
 
 * Courses: [Acloudguru](https://learn.acloud.guru/course/aws-certified-developer-associate/dashboard), [Udemy](https://www.udemy.com/course/aws-certified-solutions-architect-associate-exam/)
 * Practice exams: [Braincert (DVA-C01)](https://www.braincert.com/course/lecture/14950-AWS-Certified-Developer-Associate-June-2018-Practice-Exams/18335), [Udemy](https://www.udemy.com/course/aws-certified-developer-associate-practice-tests-dva-c01), [Whizlabs](https://www.whizlabs.com/aws-developer-associate/practice-tests), [ExamTopics](https://www.examtopics.com/exams/amazon/aws-certified-developer-associate)
