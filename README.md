@@ -6,7 +6,7 @@
 
 This is a repository of notes and resources for cloud learning, primarily AWS.
 
-## AWS Cloud practicioner certificate
+## AWS certificates
 
 1. [AWS certified cloud practitioner](Accreditations/aws_cloud_practitioner.md): [[pdf]](Accreditations/aws_cloud_practitioner.pdf)
 2. [AWS cloud economics accreditation](Accreditations/aws_cloud_economics.md): [[pdf]](Accreditations/aws_cloud_economics.pdf)
