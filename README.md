@@ -10,7 +10,7 @@ This is a repository of notes and resources for cloud learning, primarily AWS.
 
 1. [AWS certified cloud practitioner](Accreditations/aws_cloud_practitioner.md): [[pdf]](Accreditations/aws_cloud_practitioner.pdf)
 2. [AWS cloud economics accreditation](Accreditations/aws_cloud_economics.md): [[pdf]](Accreditations/aws_cloud_economics.pdf)
-3. [AWS developer associate](Accreditations/aws_developer_associate.md)
+3. [AWS developer associate](Accreditations/aws_developer_associate.md): [[pdf]](Accreditations/aws_developer_associate.pdf)
 
 ## Learning
 
