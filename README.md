@@ -12,6 +12,10 @@ This is a repository of notes and resources for cloud learning, primarily AWS.
 2. [AWS cloud economics accreditation](Accreditations/aws_cloud_economics.md): [[pdf]](Accreditations/aws_cloud_economics.pdf)
 3. [AWS developer associate](Accreditations/aws_developer_associate.md): [[pdf]](Accreditations/aws_developer_associate.pdf)
 
+## Azure certificates
+
+1. [Azure 900 fundamentals](Accreditations/az_900.md): [[pdf]](Accreditations/az_900.pdf)
+
 ## Learning
 
 * [Kubernetes](kubernetes.md)
