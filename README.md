@@ -14,7 +14,8 @@ This is a repository of notes and resources for cloud learning, primarily AWS.
 
 ## Azure certificates
 
-1. [Azure 900 fundamentals](Accreditations/az_900.md): [[pdf]](Accreditations/az_900.pdf)
+1. [Azure AZ-900 fundamentals](Accreditations/az_900.md): [[pdf]](Accreditations/az_900.pdf)
+2. [Azure DP-100 data scientist associate](Accreditations/az_900.md): [[pdf]](Accreditations/az_dp_100.pdf)
 
 ## Learning
 
