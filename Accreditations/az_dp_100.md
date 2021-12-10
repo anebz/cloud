@@ -1,7 +1,12 @@
 # [Azure data scientist associate](https://docs.microsoft.com/en-us/learn/certifications/azure-data-scientist/)
 
-* [ExamTopics sample questions](https://www.examtopics.com/exams/microsoft/dp-100/view/) page 2
+Materials and practice exams
+
+* [ExamTopics sample questions](https://www.examtopics.com/exams/microsoft/dp-100/view/)
 * [Udemy practice exams](https://www.udemy.com/course/practice-exams-ms-azure-dp-100-design-implement-ds-sol/)
+* [ITExams practice questions](https://www.itexams.com/exam/DP-100)
+
+Table of contents
 
 - [Azure data scientist associate](#azure-data-scientist-associate)
 	- [1. Azure Databricks](#1-azure-databricks)
