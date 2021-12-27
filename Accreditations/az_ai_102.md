@@ -1,5 +1,33 @@
 # [Azure AI Engineer](hhttps://docs.microsoft.com/en-us/learn/certifications/azure-ai-engineer/)
 
+* [Labs for Microsoft Learn](https://github.com/MicrosoftLearning/AI-102-AIEngineer)
+
+- [Azure AI Engineer](#azure-ai-engineer)
+  - [Azure cognitive services](#azure-cognitive-services)
+  - [Monitoring](#monitoring)
+  - [Language](#language)
+    - [Language detection](#language-detection)
+    - [Key-phrase extraction](#key-phrase-extraction)
+    - [Sentiment analysis](#sentiment-analysis)
+    - [Named entity recognition](#named-entity-recognition)
+    - [Entity linking](#entity-linking)
+    - [Translation](#translation)
+    - [Language understanding (LUIS)](#language-understanding-luis)
+    - [Question answering](#question-answering)
+    - [Bots](#bots)
+  - [Speech](#speech)
+    - [Speech to text](#speech-to-text)
+    - [Text to speech](#text-to-speech)
+    - [Speech translation](#speech-translation)
+  - [Vision](#vision)
+    - [Computer vision](#computer-vision)
+  - [Cognitive search](#cognitive-search)
+    - [Search an index](#search-an-index)
+    - [Filtering results](#filtering-results)
+    - [Filtering with facets](#filtering-with-facets)
+  - [Decision](#decision)
+  - [Applied AI services](#applied-ai-services)
+
 Responsible AI:
 
 * Fairness
@@ -28,7 +56,7 @@ client = TextAnalyticsClient(endpoint=cog_endpoint, credential=credential)
 
 Keys can also be stored in a keyvault. To do this, a Service Principal has to be created and given access to the keyvault.
 
-### Monitoring
+## Monitoring
 
 * Azure pricing calculator (needs specific cognitive service API, region and pricing tier)
 * View costs in Costs analysis
@@ -62,9 +90,9 @@ Even when using a container, the CS resource must be provisioned in Azure for bi
 
 To deploy to container, must specify 3 settings: ApiKey, Billing, Eula (value of accept to state you accept the license of the container). No subscription key necessary
 
-### Language
+## Language
 
-#### Language detection
+### Language detection
 
 Input request. Max 5120 characters in text, max 1000 documents. Optionally, you can provide a countryHint to improve prediction performance.
 
@@ -108,7 +136,7 @@ Response json:
 
 If there are encoding problems, or text isn't string, the result will be (Unknown) and score: NaN
 
-#### Key-phrase extraction
+### Key-phrase extraction
 
 In the code:
 
@@ -137,7 +165,7 @@ Input JSON same as with language detection. Response:
 }
 ```
 
-#### Sentiment analysis
+### Sentiment analysis
 
 In the code:
 
@@ -209,7 +237,7 @@ Output:
 * If sentences are negative + neutral -> negative
 * If sentences are positive + negative -> mixed
 
-#### Named entity recognition
+### Named entity recognition
 
 In the code:
 
@@ -259,6 +287,8 @@ Same input as sentiment analysis. Output:
 }
 ```
 
+The ID attribute can be used when there are multiple entries in the document. It helps to identify the specific text portion where the entity was located. As an example, if the submitted request contains more than one entry for text, the ID is used to locate the entities for that text, within the results.
+
 * Domain: email, communication
 * Utterance: turn on the light
 * Entity: Paris, Lamp
@@ -270,7 +300,7 @@ Entity types:
 * Regular Expression or RegEx entities are useful when an entity can be identified by matching a particular format of string. For example, a date in the format MM/DD/YYYY, or a flight number in the format AB-1234
 * Pattern.any() entities are used with patterns, which are discussed in the next topic
 
-#### Entity linking
+### Entity linking
 
 In the code:
 
@@ -313,7 +343,7 @@ Identifying specific entities by providing reference links to Wikipedia articles
 }
 ```
 
-#### Translation
+### Translation
 
 To access the API, we need the subscription key and the location.
 
@@ -388,9 +418,13 @@ response = request.json()
 translation = response[0]["translations"][0]["text"]
 ```
 
-#### Language understanding
+### Language understanding (LUIS)
 
-Using LUIS app (luis.ai). To access endpoint, we need App ID, endpoint URL and primary key/secondary key. Model can be exported to a .lu file and imported into another Language understanding app
+It's the NLP service that enables language interactions between users and conversational AI agents. This can be encapsulated into a bot, but LUIS is the backend of the conversation.
+
+To access endpoint, we need App ID, endpoint URL and primary key/secondary key. Model can be exported to a .lu file and imported into another Language understanding app.
+
+To create a new LUIS app version, clone an existing version and then make changes to the cloned app.
 
 To deploy: staging, production. When deploying you can activate sentiment analysis, spelling correction, speech priming (if it'll be used with speech)
 
@@ -426,18 +460,114 @@ If the operation was successful, the Reason property has the enumerated value **
 
 Other possible values for Result include **RecognizedSpeech**, which indicates that the speech was successfully transcribed (the transcription is in the Text property), but no matching intent was identified. If the result is **NoMatch**, the audio was successfully parsed but no speech was recognized, and if the result is **Canceled**, an error occurred (in which case, you can check the Properties collection for the CancellationReason property to determine what went wrong.)
 
+### Question answering
+
+1. Create knowledge base
+   1. Option 1: REST API or SDK
+   2. Option 2: Language Studio UI
+
+Create a language resource in the azure portal, enable question answering feature, create/select azure cognitive search to host the knowledge base index. Create project in Language Studio and choose the data source
+
+* URLs for webpages containing FAQs
+* Files containing structured text from which questions and answers can be derived
+* Pre-defined chit-chat datasets that include common conversational questions and responses
+
+After defining the knowledeg base, train its natural language model and test it, and deploy it to a REST endpoint.
+
+The response has this format:
+
+```json
+{
+  "answers": [
+    {
+      "questions": [
+        "How can I cancel a reservation?"
+      ],
+      "answer": "Call us on 555 123 4567 to cancel a reservation.",
+      "confidenceScore": 1.0,
+      "id": 6,
+      "source": "https://margies-travel.com/faq",
+      "metadata": {},
+      "dialog": {
+        "isContextOnly": false,
+        "prompts": []
+      }
+    }
+  ]
+}
+```
+
+To improve performance, use active learning:
+
+* Implicit feedback: the service identifies questions with similar scores, they are automatically clustered as alternate phrase suggestions for the possible answers that you can accept/reject in the Suggestions page in Language Studio
+* Explicit feedback: when asking a question you can ask for "top":3, in which case you get the top 3 questions associated with your question. You can pick the question that matches your most and use that, by referencing the qnaId of the suggestion you received earlier.
+
+You can submit synonyms to the REST API by uploading a json file with a specific format.
+
+Language Studio provides the option to easily create a bot that runs in the Azure Bot Service based on your knowledge base. To create a bot from your knowledge base, use Language Studio to deploy the bot and then use the Create Bot button to create a bot in your Azure subscription. You can then edit and customize your bot in the Azure portal.
+
+### Bots
+
+* Azure Bot Service. A cloud service that enables bot delivery through one or more channels, and integration with other services
+* Bot Framework Service. A component of Azure Bot Service that provides a REST API for handling bot activities
+* Bot Framework SDK. A set of tools and libraries for end-to-end bot development that abstracts the REST interface, enabling bot development in a range of programming languages
+* QnA Maker: helps create a knowledge base that can be used for a conversation between humans and AI agents
+  * First provision a QnA maker resource, then create and populate the knowledge base
+  * QnA maker can contain several knowledge bases, but the language of the first knowledge base defines the language for the rest of the bases within that resource
+
+![ ](https://docs.microsoft.com/en-us/learn/wwl-data-ai/design-bot-conversation-flow/media/azure-bot-technologies.png)
+
+> Bot Framework SDK
+
+Bot templates
+
+* Empty bot: basic bot skeleton
+* Echo bot: simple "hello world" sample
+* Core bot: common bot functionality, e.g. integration with the language understanding service
+
+**Bot framework emulator** allows for testing the bot locally
+
+Bots make use of an Adapter class that handles communication with the user's channel. The Bot Framework Service notifies your bot's adapter when an activity occurs in a channel by calling its **Process Activity** method, and the adapter creates a context for the turn and calls the bot's **Turn Handler** method to invoke the appropriate logic for the activity.
+
+* Activity handlers: Event methods that you can override to handle different kinds of activities. Includes:
+  * Message received
+  * Member joined the conversation
+  * Member left the conversation
+  * Message reaction received
+  * Bot installed
+* Dialogs: More complex patterns for handling stateful, multi-turn conversations.
+  * Component dialog: can contain subdialogs. usually main dialog is a waterfall dialog, defining sequential steps (pizza ordering)
+  * Adaptive dialog: more flexible flow, allowing for interruptions, cancellations, context switches
+  * To build bots with complex dialogs, use **Bot framework composer**. This allows interruptions and context switches
+
+An adaptive dialog consists of:
+
+* 1+ actions defining the flow of message activities in the dialog
+* Language generator: formulates the output to the user
+* Recognizer: interprets user input to determine semantic intent
+* Trigger: fired by actions or based on the intent detected by the recognizer
+
+![ ](https://docs.microsoft.com/en-gb/learn/wwl-data-ai/create-bot-with-bot-framework-composer/media/adaptive-dialog.png)
+
+User experience:
+
+* Text
+* Speech: the bot will have to access the Speech cognitive service
+* Buttons
+* Images
+* Cards: visual, audio, selectable messages
+
 ---
 
 Other tasks:
 
 * Text analysis
-* Question answering
 
-### Speech
+## Speech
 
 Needs subscription key and location to access the API.
 
-#### Speech to text
+### Speech to text
 
 * The Speech-to-text API, which is the primary way to perform speech recognition. The endpoint for this API is `https://<LOCATION>.api.cognitive.microsoft.com/sts/v1.0`
 * The Speech-to-text Short Audio API, which is optimized for short streams of audio (up to 60 seconds). The endpoint for this API is at `https://<LOCATION>.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`
@@ -456,9 +586,14 @@ Needs subscription key and location to access the API.
   * ResultId
   * Text
 
-#### Text to speech
+### Text to speech
 
 * The Text-to-speech API, which is the primary way to perform speech synthesis. The endpoint for this API is `https://<LOCATION>.api.cognitive.microsoft.com/sts/v1.0`
+  * Speech synthesis supports
+    * Enhancing learning with multiple modes
+    * Responding in multitasking scenarios
+    * Improving accessibility
+    * Delivering intuitive bots or assistants
 * The Text-to-speech Long Audio API, which is designed to support batch operations that convert large volumes of text to audio - for example to generate an audio-book from the source text. The endpoint for this API is at `https://<LOCATION>.customvoice.api.speech.microsoft.com/api/texttospeech/v3.0/longaudiosynthesis`
 
 ![ ](https://docs.microsoft.com/en-us/learn/wwl-data-ai/transcribe-speech-input-text/media/text-to-speech.png)
@@ -469,7 +604,7 @@ Audio format: you can pick the audio file type, the sample rate and the bit dept
 speechConfig.SetSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Riff24Khz16BitMonoPcm);
 ```
 
-For voices, you can pick standard voices (synthetic) or neural (natural, created from DNNs). To specify a voice:
+For voices, you can pick standard voices (synthetic),  neural (natural, created from DNNs) or custom. To specify a voice:
 
 ```python
 speechConfig.SpeechSynthesisVoiceName = "en-GB-George";
@@ -502,7 +637,7 @@ You can also use the *Speech Synthesis Markup Language (SSML)*. this includes:
 speechSynthesizer.SpeakSsmlAsync(ssml_string);
 ```
 
-#### Speech translation
+### Speech translation
 
 TranslationRecognizer does speech to text
 
@@ -526,30 +661,172 @@ To do speech-to-speech directly:
 
 * Speaker recognition
 
-### Vision
+## Vision
+
+### Computer vision
 
 * Image analysis
-* Video analysis
-* Image classification
-* Object detection
+  * Upload image, specify the visual features you want to include in the analysis by adding a description. Returns JSON with description, captions, confidence scores
+* Generate smart-cropped thumbnail
+  * Thumbnails can have a width and height up to 1024 pixels, with a recommended minimum size of 50x50 pixel
+  * When you run a curl command in Azure CLI, thumbnails are stored in Azure Cloud shell storage accoutn with the filename thumbnail.jpg
+* Video analysis in the Video Analyzer for Media
+  * Can extract: people, language, brands, animated characters
+  * Can be used through the portal, widget or API
+  * First upload the video and index it
+  * For recognizing custom entities (specific people), create a custom model containing a Person for each person, with example images of their faces
+  * Videos are split into shots by the video indexer
+  * Video insights contain: transcript, ocr, keywords, labels, faces, brands, sentiments, emotions
+* Custom vision
+  * Needs 2 resources: training and prediction. A single cognitive resource can be used for both, or mix custom vision / cognitive resource
+  * Can be used for image classification and object detection
+  * Supports active learning
 * Facial analysis
+  * Computer vision service: gender, age
+  * Face service: bounding box offace, facial feature analysis (age, gender, emotional state, head pose, hair color, facial hair, glasses), face comparison, facial recognition
+  * Data privacy and security, transparency, fairness and inclusiveness
+  * When a face is detected by the Face service, an ID is assigned to it. Next images are compared to the previous image for facial recognition
 * Optical character recognition
+  * OCR API
+    * read small-medium volumes of text from images
+    * Supports multiple languages
+    * Resultes are returned immediately from a single function call
+    * Input: image URL / binary image data, language, and optional input parameter detectOrientation
+    * In the result, the text is broken down by region, then line, and then word
+  * Read API
+    * Small-large volumes of text from images and PDF documents
+    * More accuracy than OCR API
+    * Can read printed text in multiple languages, and handwritten text in English
+    * The initial function call returns an asynchronous operation ID, which must be used in a subsequent call to retrieve the results
+    * Input: image URL / binary image data, language
+    * In the result, the text is broken down by page, then line, and then word
+* Form recognizer
+  * OCR to extract semantic meaning from forms
+  * Form OCR test tool (FOTT) UI: supports prebuilt models, layout and custom training
+  * Create Cognitive service resource or Form recognizer resource
+  * Services:
+    * Layout: takes input of jpeg, png, pdf and tiff (less than 50MB). Image dimensions must be between 50x50 and 10kx10k. Total size of training dataset must be less than 500 pages. Returns json file with location of text in bbox, text content, tables etc
+    * Prebuilt models: detect and extract info from document images. Support for: receipts, business cards, invoices
+    * Custom models: can be trained by calling the Train Custom Model API. Can be used unsupervised(at least 5 samples) / supervised (needs files, .ocr.json, .labels.json, .fields.json)
 
-### Decision
+## Cognitive search
+
+* Index documents and data from a range of sources.
+* Use cognitive skills to enrich index data.
+* Store extracted insights in a knowledge store for analysis and integration.
+
+Service tiers:
+
+* Free
+* Basic: max 15 indexes, 2GB of index data
+* Standard: enterprise-scale solutions. S, S2, S3, S3HD
+* Storage optimized: L1, L2. More latency but large indexes
+
+* Replica: instances of the device, increase for more capacity
+* Partition: used to divide an index into multiple storaeg locations, enabling you to split I/O operations such as querying or rebuilding an index
+
+The combination of replicas and partitions you configure determines the search units used by your solution. Put simply, the number of search units is the number of replicas multiplied by the number of partitions (R x P = SU). For example, a resource with four replicas and three partitions is using 12 search units.
+
+Search components:
+
+* Data source: unstructured files in Azure blob, tables in SQL database, documents in Cosmos DB
+* Skillset: AI skills can be applied to indexing to enrich the source data with new info: language, key phrases, sentiment score, specific locations/people/etc, AI generated description of images
+  * The **Shaper** skill maps the enriched fields extracted by a given skillset to the desired structure for the knowledge store data
+* Indexer: the engine that drives the indexing
+  * An indexer is automatically run when it is created, and can be scheduled to run at regular intervals or run on demand to add more documents to the index
+  * In some cases, such as when you add new fields to an index or new skills to a skillset, you may need to reset the index before re-running the indexer
+* Index: the searchable result of the indexing. It's a collection of JSON documents
+
+When indexing, one document is created for each indexed entity. During indexing, an enrichment pipeline iteratively builds the documents that combine metadata from the data source with enriched fields extracted by cognitive skills.
+
+```json
+documents
+  metadata_storage_name
+  metadata_author
+  content
+  normalized_images
+      image0
+          Text
+      image1
+          Text
+  language
+  merged_content
+```
+
+### Search an index
+
+Full text search
+
+* Simple - An intuitive syntax that makes it easy to perform basic searches that match literal query terms submitted by a user
+* Full - An extended syntax that supports complex filtering, regular expressions, and other more sophisticated queries
+  * based on the Lucene query syntax, which provides a rich set of query operations for searching, filtering, and sorting data in indexes.
+
+
+Query processing has 4 stages:
+
+1. Query parsing
+   1. The search expression is evaluated and reconstructed as a tree of appropriate subqueries. Subqueries might include term queries (finding specific individual words in the search expression - for example hotel), phrase queries (finding multi-term phrases specified in quotation marks in the search expression - for example, "free parking"), and prefix queries (finding terms with a specified prefix - for example air*, which would match aircon, air-conditioning, and airport)
+2. Lexical analysis
+   1. The query terms are analyzed and refined based on linguistic rules. For example, text is converted to lower case, non-essential stopwords (such as "the", "a", "is", and so on) are removed, words are converted to their root form (for example, "comfortable" may be simplified to "comfort"), and composite words are split into their constituent terms
+3. Document retrieval
+   1. The query terms are matched against the indexed terms, and the set of matching documents is identified
+4. Scoring
+   1. A relevance score is assigned to each result based on a term frequency/inverse document frequency (TF/IDF) calculation
+
+### Filtering results
+
+Filters can be applied in 2 ways, and can be applied to any filterable field in the index
+
+* By including filter criteria in a simple search expression
+* By providing an OData filter expression as a $filter parameter with a full syntax search expression
+
+```sql
+// simple search
+search=London+author='Reviewer'
+queryType=Simple
+
+// full search
+search=London
+$filter=author eq 'Reviewer'
+queryType=Full
+```
+
+### Filtering with facets
+
+For fields that have a small number of discrete values. To use facets you must specify facetable fields in the index.
+
+```sql
+// example 1
+search=*
+facet=author
+
+// example 2
+search=*
+$filter=author eq 'selected-facet-value-here'
+```
+
+To sort results
+
+```sql
+search=*
+$orderby=last_modified desc
+```
+
+* Enrichment pipeline: enhance the index with insights derived from source data (using NLP and CV to generate descriptions of images)
+* Enrichment pipeline can be persisted in a knowledge store for further analysis
+
+## Decision
 
 * Anomaly detection
-* Content moderation
+* Text moderation
+  * Each category is returned wihh a score between 0 and 1 to indicate the predicted category.
+  * Analyze text to look for unwanted content
+  * Classify the potentially offensive content
+  * Get insights into the potential PII that's being shared so that you can protect it
+  * But it doesn't support automatically blocking repeat offenders of submitting spam content
 * Content personalization
 
 ## Applied AI services
 
-* Form recognizer: OCR to extract semantic meaning from forms
 * Metrics advisor: built on the anomaly detector cognitive service that simplifies real-time monitoring and response to critical metrics
-* Video analyzer for media: video analysts solution build on the Video Indexer cognitive service
 * Immersive reader
-* Bot service
-	- Bot framework SDK: write code
-	- Bot framework composer: develop complex bots using a UI
-* Cognitive search
-	- Enrichment pipeline: enhance the index with insights derived from source data (using NLP and CV to generate descriptions of images)
-	- Enrichment pipeline can be persisted in a knowledge store for further analysis
