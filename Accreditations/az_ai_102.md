@@ -237,6 +237,8 @@ Output:
 * If sentences are negative + neutral -> negative
 * If sentences are positive + negative -> mixed
 
+Max character count that can be sent to the service in each document: 5120 characters. Max amount of documents: 1000 documents.
+
 ### Named entity recognition
 
 In the code:
@@ -292,6 +294,7 @@ The ID attribute can be used when there are multiple entries in the document. It
 * Domain: email, communication
 * Utterance: turn on the light
 * Entity: Paris, Lamp
+* Intent: BookFlight (part of LUIS)
 
 Entity types:
 
@@ -424,7 +427,19 @@ It's the NLP service that enables language interactions between users and conver
 
 To access endpoint, we need App ID, endpoint URL and primary key/secondary key. Model can be exported to a .lu file and imported into another Language understanding app.
 
-To create a new LUIS app version, clone an existing version and then make changes to the cloned app.
+When creating an app, first create intents, then utterances. When adding utterances, add utterances unrelated to the app into the None intent. These are sentences that will trigger no intents.
+
+To create a new LUIS app version, clone an existing version and then make changes to the cloned app. If there are 1+ contributors, you can clone the base app for each contributor so you end up with 1 base app and 1+ cloned copies.
+
+Also, you can export the base version into a json or .lu file. Each contrbutor imports that version
+
+There are 3 LUIS websites based on the region.
+
+* www.luis.ai: US
+* au.luis.ai: Australia
+* eu.luis.ai: Europe
+
+LUIS must be taught how to pick out the search subject as the Facet entity. Whatever this entity pikcs up, is what the app will search for.
 
 To deploy: staging, production. When deploying you can activate sentiment analysis, spelling correction, speech priming (if it'll be used with speech)
 
@@ -449,7 +464,18 @@ to use LU app in a container:
 4. Use container to predict intents
 5. The conatiner sends usage metrics to the prediction resource for billing
 
-Perform intent recognition with the Speech SDK
+LUIS lifecycle, versioning is part of it:
+
+* Create LUIS app
+* Edit schema
+* Train the app
+* Test the app
+* Publish the app
+* Evaluate the app
+
+Perform intent recognition with the Speech SDK.
+
+If the intents core is low or if the correct intent is not the top scoring intent, use pattern matching. Patterns can improve prediction scores on utterances that reveal patterns in the word order and choice of words used.
 
 ![ ](https://docs.microsoft.com/en-gb/learn/wwl-data-ai/use-language-understanding-speech/media/speech-sdk.png)
 
@@ -459,6 +485,11 @@ Perform intent recognition with the Speech SDK
 If the operation was successful, the Reason property has the enumerated value **RecognizedIntent**, and the IntentId property contains the top intent name. Full details of the Language Understanding prediction can be found in the Properties property, which includes the full JSON prediction.
 
 Other possible values for Result include **RecognizedSpeech**, which indicates that the speech was successfully transcribed (the transcription is in the Text property), but no matching intent was identified. If the result is **NoMatch**, the audio was successfully parsed but no speech was recognized, and if the result is **Canceled**, an error occurred (in which case, you can check the Properties collection for the CancellationReason property to determine what went wrong.)
+
+LUIS keys:
+
+* Authoring key: to programatically author LUIS apps
+* Prediction key: query prediction endpoint requests beyond the 1000 requests provided by the starter resource
 
 ### Question answering
 
@@ -525,6 +556,12 @@ Bot templates
 * Echo bot: simple "hello world" sample
 * Core bot: common bot functionality, e.g. integration with the language understanding service
 
+Bot fraoework units:
+
+* Activity handlers: event methods that you can override to handle different kinds of activities
+* Turn context: an activity occurs within the context of a turn. Activity handler methods include a parameter for the turn context which you can use to access relevant information, for example to access the text of the message that was received
+* Dialogues: more complex paterns for handling stateful, multi-turn conversations
+
 **Bot framework emulator** allows for testing the bot locally
 
 Bots make use of an Adapter class that handles communication with the user's channel. The Bot Framework Service notifies your bot's adapter when an activity occurs in a channel by calling its **Process Activity** method, and the adapter creates a context for the turn and calls the bot's **Turn Handler** method to invoke the appropriate logic for the activity.
@@ -549,6 +586,8 @@ An adaptive dialog consists of:
 
 ![ ](https://docs.microsoft.com/en-gb/learn/wwl-data-ai/create-bot-with-bot-framework-composer/media/adaptive-dialog.png)
 
+If you need a bot and some users want to use Teams and others a web chat, create a knowledge base, create a bot for it and connect the web chat and Team channels for your bot.
+
 User experience:
 
 * Text
@@ -556,12 +595,6 @@ User experience:
 * Buttons
 * Images
 * Cards: visual, audio, selectable messages
-
----
-
-Other tasks:
-
-* Text analysis
 
 ## Speech
 
@@ -657,10 +690,6 @@ To do speech-to-speech directly:
     * Use a TranslationRecognizer to translate spoken input into text transcriptions in one or more target languages
     * Iterate through the Translations dictionary in the result of the translation operation, using a SpeechSynthesizer to synthesize an audio stream for each language
 
----
-
-* Speaker recognition
-
 ## Vision
 
 ### Computer vision
@@ -676,6 +705,7 @@ To do speech-to-speech directly:
   * First upload the video and index it
   * For recognizing custom entities (specific people), create a custom model containing a Person for each person, with example images of their faces
   * Videos are split into shots by the video indexer
+    * In the video indexer subscription, for an API request you need the Account ID and the API key
   * Video insights contain: transcript, ocr, keywords, labels, faces, brands, sentiments, emotions
 * Custom vision
   * Needs 2 resources: training and prediction. A single cognitive resource can be used for both, or mix custom vision / cognitive resource
@@ -683,7 +713,7 @@ To do speech-to-speech directly:
   * Supports active learning
 * Facial analysis
   * Computer vision service: gender, age
-  * Face service: bounding box offace, facial feature analysis (age, gender, emotional state, head pose, hair color, facial hair, glasses), face comparison, facial recognition
+  * Face service: bounding box of face, facial feature analysis (age, gender, emotional state, head pose, hair color, facial hair, glasses), face comparison, facial recognition
   * Data privacy and security, transparency, fairness and inclusiveness
   * When a face is detected by the Face service, an ID is assigned to it. Next images are compared to the previous image for facial recognition
 * Optical character recognition
@@ -732,6 +762,7 @@ Search components:
 * Data source: unstructured files in Azure blob, tables in SQL database, documents in Cosmos DB
 * Skillset: AI skills can be applied to indexing to enrich the source data with new info: language, key phrases, sentiment score, specific locations/people/etc, AI generated description of images
   * The **Shaper** skill maps the enriched fields extracted by a given skillset to the desired structure for the knowledge store data
+  * If there is a custom skill implemented as an Azure function, add a WebApiSkill to a skillset and reference the function's URI
 * Indexer: the engine that drives the indexing
   * An indexer is automatically run when it is created, and can be scheduled to run at regular intervals or run on demand to add more documents to the index
   * In some cases, such as when you add new fields to an index or new skills to a skillset, you may need to reset the index before re-running the indexer
@@ -819,10 +850,15 @@ $orderby=last_modified desc
 
 * Anomaly detection
 * Text moderation
-  * Each category is returned wihh a score between 0 and 1 to indicate the predicted category.
+  * Category: score between 0 and 1
   * Analyze text to look for unwanted content
   * Classify the potentially offensive content
-  * Get insights into the potential PII that's being shared so that you can protect it
+    * Category 1: sexually explicit or adult language
+    * Category 2: sexually suggestive or mature language
+    * Category 3: offensive language
+  * Returns a boolean for "reviewRecommended"
+  * The "ListId" identifies a specific term found in a custom term list, if such list is available
+  * Get insights into the potential PII that's being shared so that you can protect it. If PII values are found, the API returns info about the text and the index location within the text
   * But it doesn't support automatically blocking repeat offenders of submitting spam content
 * Content personalization
 
