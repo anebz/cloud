@@ -1,6 +1,8 @@
 # [Azure AI Engineer](hhttps://docs.microsoft.com/en-us/learn/certifications/azure-ai-engineer/)
 
 * [Labs for Microsoft Learn](https://github.com/MicrosoftLearning/AI-102-AIEngineer)
+* [Udemy course with practice exams 2021](https://www.udemy.com/course/practice-exams-microsoft-azure-ai-100-azure-ai-engineer/)
+* [Examtopics practice questions](https://www.examtopics.com/exams/microsoft/ai-102/view/)
 
 ---
 
@@ -16,15 +18,15 @@
     - [4.5. Entity linking](#45-entity-linking)
     - [4.6. Translation](#46-translation)
     - [4.7. Question answering](#47-question-answering)
-    - [4.8. Text moderation](#48-text-moderation)
+    - [4.8. Content moderation](#48-content-moderation)
     - [4.9. Language understanding (LUIS)](#49-language-understanding-luis)
       - [LUIS basics](#luis-basics)
       - [Intent recognition with Speech SDK](#intent-recognition-with-speech-sdk)
       - [Accessing endpoint](#accessing-endpoint)
       - [LUIS in a container](#luis-in-a-container)
       - [LUIS app lifecycle](#luis-app-lifecycle)
-      - [LUIS keys](#luis-keys)
     - [4.9. Bots](#49-bots)
+      - [Bot framework units](#bot-framework-units)
   - [5. Speech](#5-speech)
     - [5.1. Speech to text](#51-speech-to-text)
     - [5.2. Text to speech](#52-text-to-speech)
@@ -51,24 +53,28 @@ Responsible AI:
 * Transparency
 * Accountability
 
+To use the system in VSCode, click on the command prompt/terminal at the bottom of the GUI.
+
 ## 1. Azure cognitive services
 
 * Single-service resource: individual resource. Different endpoint for each service, separate billing. Offers free tier
 * Multi-service resource: language, computer vision, speech, etc
 
+The pricing tear of the Cognitive Services resource can't be changed later, a new one must be created. Pricing tiers:
+
+* Free
+* Basic: max 15 indexes, 2GB of index data
+* Standard: enterprise-scale solutions. S, S2, S3, S3HD
+* Storage optimized: L1, L2. More latency but large indexes
+
+To create a CognitiveServices resource with API: PUT method (not POST)
+
 To consume the endpoint, we need:
 
 * Endpoint URI
 * Subscription key (sometimes synonym with API key)
+  * Keys can also be stored in a keyvault. To do this, a Service Principal has to be created and given access to the keyvault
 * Resource location
-
-```python
-# pip install azure-ai-textanalytics==5.0.0
-credential = AzureKeyCredential(cog_key)
-client = TextAnalyticsClient(endpoint=cog_endpoint, credential=credential)
-```
-
-Keys can also be stored in a keyvault. To do this, a Service Principal has to be created and given access to the keyvault.
 
 ## 2. Monitoring
 
@@ -112,12 +118,6 @@ To deploy to container, must specify 3 settings: ApiKey, Billing, Eula (value of
 
 Input request. Max 5120 characters in text, max 1000 documents. Optionally, you can provide a countryHint to improve prediction performance.
 
-In the code:
-
-```python
-sentimentAnalysis = cog_client.detect_language(documents=[text])[0]
-```
-
 ```json
 {
   "documents": [
@@ -154,15 +154,7 @@ If there are encoding problems, or text isn't string, the result will be (Unknow
 
 ### 4.2. Key-phrase extraction
 
-In the code:
-
-```python
-phrases = cog_client.extract_key_phrases(documents=[text])[0].key_phrases
-for phrase in phrases:
-    print('\t{}'.format(phrase))
-```
-
-Input JSON same as with language detection. Response:
+Evaluates unstructured text. Input JSON same as with language detection. Response:
 
 ```json
 {
@@ -182,12 +174,6 @@ Input JSON same as with language detection. Response:
 ```
 
 ### 4.3. Sentiment analysis
-
-In the code:
-
-```python
-sentimentAnalysis = cog_client.analyze_sentiment(documents=[text])[0]
-```
 
 Input:
 
@@ -227,17 +213,6 @@ Output:
            },
          "offset": 0,
          "length": 6
-       },
-       {
-	      "text": "Life is good!",
-          "sentiment": "positive",
-          "confidenceScores": {   
-             "positive": 0.98,
-	           "neutral": 0.02,  
-             "negative": 0.00
-           },
-         "offset": 7,
-         "length": 13
        }
      ],
      "warnings": []
@@ -253,15 +228,11 @@ Output:
 * If sentences are negative + neutral -> negative
 * If sentences are positive + negative -> mixed
 
+The API returns either a number, or "mixed". For the number, 1 is positive and 0 negative.
+
+When building an end-to-end sentiment pipeline, first new feedback goes to an Azure queue, which triggers a Function, gets the sentiment and sends the message to positive_feedback_q, neutral_feedback_q or negative_feedback_q. When the message is output from the function to the queue, the direction is *out*.
+
 ### 4.4. Named entity recognition
-
-In the code:
-
-```python
-entities = cog_client.recognize_entities(documents=[text])[0].entities
-for entity in entities:
-    print(f"{entity.text}: {entity.category}")
-```
 
 Same input as sentiment analysis. Output:
 
@@ -303,48 +274,39 @@ Same input as sentiment analysis. Output:
 }
 ```
 
-The ID attribute can be used when there are multiple entries in the document. It helps to identify the specific text portion where the entity was located. As an example, if the submitted request contains more than one entry for text, the ID is used to locate the entities for that text, within the results.
+The ID attribute can be used when there are multiple entries in the document. It helps identify the specific text portion where the entity was located. As an example, if the submitted request contains more than one entry for text, the ID is used to locate the entities for that text, within the results.
 
 ### 4.5. Entity linking
 
-In the code:
-
-```python
-entities = cog_client.recognize_linked_entities(documents=[text])[0].entities
-for linked_entity in entities:
-    print(f"{linked_entity.name}: {linked_entity.url}")
-```
-
-Identifying specific entities by providing reference links to Wikipedia articles. Output: 
+Identifies specific entities by providing reference links to Wikipedia articles. Output: 
 
 ```json
 {
-  "documents":
-    [
-      {
-        "id":"1",
-        "entities":[
-          {
-            "name":"Venus",
-            "matches":[
-              {
-                "text":"Venus",
-                "offset":6,
-                "length":5,
-                "confidenceScore":0.01
-              }
-            ],
-            "language":"en",
-            "id":"Venus",
-            "url":"https://en.wikipedia.org/wiki/Venus",
-            "dataSource":"Wikipedia"
-          }
-        ],
-        "warnings":[]
-      }
-    ],
-  "errors":[],
-  "modelVersion":"2020-02-01"
+  "documents": [
+    {
+      "id": "1",
+      "entities": [
+        {
+          "name": "Venus",
+          "matches": [
+            {
+              "text": "Venus",
+              "offset": 6,
+              "length": 5,
+              "confidenceScore": 0.01
+            }
+          ],
+          "language": "en",
+          "id": "Venus",
+          "url": "https://en.wikipedia.org/wiki/Venus",
+          "dataSource": "Wikipedia"
+        }
+      ],
+      "warnings": []
+    }
+  ],
+  "errors": [],
+  "modelVersion": "2020-02-01"
 }
 ```
 
@@ -360,7 +322,7 @@ Profanity filtering:
 
 * NoAction
 * Deleted
-* Marked: replaced by **** or any other technique.
+* Marked: replaced by \*\*\*\* or any other technique.
 
 A custom model can be trained with custom translations. Your custom model is assigned a unique category Id, which you can specify in translate calls to your Translator resource by using the category parameter, causing translation to be performed by your custom model instead of the default model.
 
@@ -390,7 +352,6 @@ response = request.json()
 
 # Parse JSON array and get language
 language = response[0]["language"]
-
 
 # Use the Translator translate function
 path = '/translate'
@@ -424,10 +385,8 @@ translation = response[0]["translations"][0]["text"]
 ### 4.7. Question answering
 
 1. Create knowledge base
-   1. Option 1: REST API or SDK
-   2. Option 2: Language Studio UI
-   
-To access this knowledge base, we need the ID, endpoint and authorization key.
+  1. Option 1: REST API or SDK
+  2. Option 2: Language Studio UI
 
 Create a language resource in the azure portal, enable question answering feature, create/select azure cognitive search to host the knowledge base index. Create project in Language Studio and choose the data source
 
@@ -435,7 +394,7 @@ Create a language resource in the azure portal, enable question answering featur
 * Files containing structured text from which questions and answers can be derived
 * Pre-defined chit-chat datasets that include common conversational questions and responses
 
-After defining the knowledeg base, train its natural language model and test it, and deploy it to a REST endpoint.
+After defining the knowledeg base, train its natural language model and deploy it to a REST endpoint. To access the endpoint, we need the ID, endpoint and authorization key.
 
 The response has this format:
 
@@ -469,13 +428,17 @@ You can submit synonyms to the REST API by uploading a json file with a specific
 
 Language Studio provides the option to easily create a bot that runs in the Azure Bot Service based on your knowledge base. To create a bot from your knowledge base, use Language Studio to deploy the bot and then use the Create Bot button to create a bot in your Azure subscription. You can then edit and customize your bot in the Azure portal.
 
-### 4.8. Text moderation
+### 4.8. Content moderation
+
+Needs a Content moderation resource.
 
 Analyzes text or images (min 128 pixels and max file size 4MB) to classify potentially offensive content. Each category has a score between 0 and 1
 
 * Category 1: sexually explicit or adult language
 * Category 2: sexually suggestive or mature language
 * Category 3: offensive language
+
+---
 
 * Returns a boolean for "reviewRecommended"
 * The "ListId" identifies a specific term found in a custom term list, if such list is available
@@ -485,41 +448,44 @@ Doesn't support automatically blocking repeat offenders of submitting spam conte
 
 ### 4.9. Language understanding (LUIS)
 
-It's the NLP service that enables language interactions between users and conversational AI agents. This can be encapsulated into a bot, but LUIS is the backend of the conversation.
+It's the NLP service that enables language interactions between users and **conversational** AI agents. It enables **conversation** AI by a bot or a QnA maker.
 
-Dashboard: main page, manage page: import app, rename, clone, export, delete
+* Dashboard page: main page, info about published apps, training evaluation (correct predictions, incorrect, unclear), predictions per intent, data imbalance
+* Build page: intents, utterances, entities, review endpoint utterances, improve app performance
+* Manage page: settings. appId, versions, import app, rename, clone, export, delete, publish (staging/production)
+  * When deploying you can activate sentiment analysis, spelling correction, speech priming (allows users to interact with the LUIS app through speech).
+
+LUIS apps store utterance, entity and intent data for 30 days.
+
+To give access to more contributors, use the IAM page for the authoring resources in Azure portal.
 
 #### LUIS basics
 
-First create an Authoring resource (cognitive service) in the Azure subscription.
+First create an Authoring resource (cognitive service) in the Azure subscription. Then create a Language Understanding resource.
+* Authoring key: to programatically author LUIS apps
+* Prediction key: query prediction endpoint requests beyond the 1000 requests provided by the starter resource
 
 When creating an app, first create intents, then utterances. When adding utterances, add utterances unrelated to the app into the None intent. These are sentences that will trigger no intents. You should always provide at least 15 example utterances for each intent.
 
+If the intent score is low or if the correct intent is not the top scoring intent, use pattern matching. Patterns can improve prediction scores on utterances that reveal patterns in the word order and choice of words used.
+
 * Domain: email, communication
 * Utterance: turn on the light
+  * Bing spell check can be used to help catch spelling errors in the input utterances
 * Entity: Paris, Lamp, Light
   - Numbers (2, 3, 5) are prebuilt entities
   - For currency, use prebuilt entities
+  - Facet entity: for entities of search subjects. Hover over the utterance, click the keyword(s) that specify the search subject, and then select Facet entity: e.g. for an utterance of "show me baby pics", the Facet (subject) is "baby".
 * Intent: BookFlight
 
 Entity types:
 
-* Machine learned entities are the most flexible kind of entity, and should be used in most cases. Define a machine learned entity with a suitable name, and then associate words or phrases with it in training utterances. The model will learn to match the appropriate elements in the utterances with the entity
+* Machine learned entities are the most flexible kind of entity, and should be used in most cases. Define a machine learned entity with a suitable name, and then associate words or phrases with it in training utterances. The model will learn to match the appropriate elements in the utterances with the entity. Suitable for billing addresses
 * List entities are useful for entities with a specific set of possible values - for example, days of the week. You can include synonyms in a list entity definition, so you could define a DayOfWeek entity that includes the values "Sunday", "Monday", "Tuesday", and so on; each with synonyms like "Sun", "Mon", "Tue", and so on
 * Regular Expression or RegEx entities are useful when an entity can be identified by matching a particular format of string. For example, a date in the format MM/DD/YYYY, or a flight number in the format AB-1234
 * Pattern.any() entities are used with patterns
 
-To create a new LUIS app version, clone an existing version and then make changes to the cloned app. If there are 1+ contributors, you can clone the base app for each contributor so you end up with 1 base app and 1+ cloned copies.
-
-There are 3 LUIS websites based on the region: luis.ai (US), au.luis.ai (Australia), eu.luis.ai (Europe)
-
-To deploy: staging, production. When deploying you can activate sentiment analysis, spelling correction, speech priming (allows users to interact with the LUIS app through speech).
-
-Model can be exported to a .lu file and imported into another Language understanding app.
-
 #### Intent recognition with Speech SDK
-
-If the intent score is low or if the correct intent is not the top scoring intent, use pattern matching. Patterns can improve prediction scores on utterances that reveal patterns in the word order and choice of words used.
 
 ![ ](https://docs.microsoft.com/en-gb/learn/wwl-data-ai/use-language-understanding-speech/media/speech-sdk.png)
 
@@ -536,20 +502,24 @@ To access endpoint, we need App ID, endpoint URL and primary key/secondary key. 
 
 * query
 * show-all-intents: include all identified intents and their scores, or only the most likely intent
-* verbose: bool
+* verbose: true/false
 * log: to use active learning
 
 #### LUIS in a container
 
+Only supports a subset of the overall languages. Language support in containers focuses on the utterances used in the LUIS app.
+
 1. Download the container image
-2. Export the model for a container (.gz)
-3. Run the container with required parameters
-  - Prediction endpoint for billing
-  - Prediction key
-  - EULA acceptance
-  - Mount points (input for exported models, output for logs)
-4. Use container to predict intents
-5. The conatiner sends usage metrics to the prediction resource for billing
+2. Select version of model
+3. Export the model for a container (.gz)
+4. Run the container with required parameters
+   - **Prediction endpoint** for billing
+   - Prediction key
+   - EULA acceptance
+   - Mount points (input for exported models, output for logs)
+5. The container sends usage metrics to the prediction resource for billing
+
+Before exporting the app as a container, it must be trained and its status must be a green dot.
 
 #### LUIS app lifecycle
 
@@ -560,25 +530,28 @@ To access endpoint, we need App ID, endpoint URL and primary key/secondary key. 
 * Publish the app
 * Evaluate the app
 
-#### LUIS keys
+To create a new LUIS app version, clone an existing version and then make changes to the cloned app. If there are 1+ contributors, you can clone the base app for each contributor so you end up with 1 base app and 1+ cloned copies.
 
-* Authoring key: to programatically author LUIS apps
-* Prediction key: query prediction endpoint requests beyond the 1000 requests provided by the starter resource
+There are 3 LUIS websites based on the region: luis.ai (US), au.luis.ai (Australia), eu.luis.ai (Europe)
+
+Model can be exported to a .lu file and imported into another Language understanding app.
+
+The LUIS app can be tested on the LUIS portal, but to truly test it, publish it and then use the prediction endpoint.
 
 ### 4.9. Bots
 
-* Azure Bot Service: bot delivery and integration
+* Azure Bot Service: bot delivery and integration, provides a user interface
 * Bot Framework Service: REST interface
 * Bot Framework SDK: bot development. Bot templates:
   * Empty bot: basic bot skeleton
   * Echo bot: simple "hello world" sample
   * Core bot: common bot functionality, e.g. integration with the language understanding service
-* Bot framework emulator: local testing
+* Bot Framework emulator: local testing
 * QnA Maker: helps create a knowledge base that can be used for a conversation between humans and AI agents
   * First provision a QnA maker resource, then create and populate the knowledge base
   * QnA maker can contain several knowledge bases, but the language of the first knowledge base defines the language for the rest of the bases within that resource
 
-Bot framework units:
+#### Bot framework units
 
 * Activity handlers: event methods that you can override to handle different kinds of activities. Includes:
   * Message received
@@ -597,13 +570,15 @@ Bots make use of an Adapter class that handles communication with the user's cha
 An adaptive dialog consists of:
 
 * 1+ actions defining the flow of message activities in the dialog
-* Language generator: formulates the output to the user
 * Recognizer: interprets user input to determine semantic intent
-* Trigger: fired by actions or based on the intent detected by the recognizer
+* Trigger: responds to the intent detected by the recognizer
+* Language generator: formulates the output to the user
 
 ![ ](https://docs.microsoft.com/en-gb/learn/wwl-data-ai/create-bot-with-bot-framework-composer/media/adaptive-dialog.png)
 
 If you need a bot and some users want to use Teams and others a web chat, create a knowledge base, create a bot for it and connect the web chat and Team channels for your bot.
+
+The bot source code contains *MicrosoftAppId* and *MicrosoftAppPassword*, which the code uses to authenticate to the bot resource in Azure.
 
 User experience:
 
@@ -612,6 +587,10 @@ User experience:
 * Buttons
 * Images
 * Cards: visual, audio, selectable messages
+
+---
+
+Dispatch uses sample utterance for each of your bot's different tasks (LUIS, QnA Maker, or custom), and builds a model that can be used to properly route your user's request to the right task, even across multiple bots.
 
 ## 5. Speech
 
@@ -726,13 +705,14 @@ Upload image, specify the visual features you want to include in the analysis by
 * Can extract: people, language, brands, animated characters
 * Can be used through the portal, widget or API
 * First upload the video and index it
+* Video specs: videofilename less than 80 characters, upload size less than 30GB, max duration 4h
 * Videos are split into shots by the video indexer. Each shot includes metadata, e.g. keyframes
 * A scene is a single event within the video, it groups consecutive shots that are related. It has a start time, end time and thumbnail.
-  * Video specs: videofilename less than 80 characters, upload size less than 30GB, max duration 4h
   * Video Indexer identifies temporal segments within the video to improve how you browse and edit indexed videos. The key aspects are extracted based on changes in colour, contrast, and other semantic properties
-* For recognizing custom entities (specific people), create a custom model containing a Person for each person, with example images of their faces
+  * A person model can be added to Video indexer so that it can detect people in the videos. Create a person model and associate it to the videos.
+  * For recognizing custom entities (specific people), create a custom model containing a Person for each person, with example images of their faces
 * Video insights contain: transcript, ocr, keywords, labels, faces, brands, sentiments, emotions
-* The API request needs the Account ID and the API key
+* The API request needs the Account ID and the API key at least, and additionally, the location.
 
 ### 6.4. Custom vision
 
@@ -741,13 +721,31 @@ Upload image, specify the visual features you want to include in the analysis by
 * Supports active learning
 * Needs training key for training API and prediction key for prediction API
 * Each time a model is trained, a new iteration is created
+* Apparently it can create state-of-the-art computer vision models
+
+To export from one resource and import in the other:
+
+1. GetProjects on res1
+2. ExportProjects on res1
+3. ImportProjects on res2
 
 ### 6.5. Facial analysis
 
-* Computer vision service: gender, age
-* Face service: bounding box of face, facial feature analysis (age, gender, emotional state, head pose, hair color, facial hair, glasses), face comparison, facial recognition
-* Data privacy and security, transparency, fairness and inclusiveness
+* Computer vision API: gender, age
+  * Needs at least 5 images for each tag in order to train a model. Min 2 tags per image
+  * Contains OCR feature to read text from images
+  * Can estimate dominant and accent colors
+  * Can generate image thumbnails
+  * Can determine if an image has mature content
+  * Can describe an image with complete English sentences
+  * Can find all the faces in an image
+  * Cannot do prediction from custom classification models? According to Udemy question
+* Face service: face comparison, facial recognition
+  * Face location: bounding box with face
+  * Face landmark: collection of detailed points on a face
+  * Face attributes: age, gender, hair color
 * When a face is detected by the Face service, an ID is assigned to it. Next images are compared to the previous image for facial recognition
+* Face detection returns a FaceId, doesn't take it as input in the request. To find images of a person based on a sample image (sample image=faceID), use face/findsimilars, put faceID and other data in the body, and mode=matchPerson
 * Facial recognition builds on the facial detection API
 * Face API tasks falls into 5 categories
   - Detection: detect human faces in an image
@@ -758,14 +756,14 @@ Upload image, specify the visual features you want to include in the analysis by
 * Storage limits:
   - up to 1000 distinct faces
   - Up to 10000 persons
-  - Up to 248 faces
+  - Up to 248 faces per person
 
 ### 6.6. Optical character recognition
 
 * OCR API
   * read small-medium volumes of text from images
   * Supports multiple languages
-  * Resultes are returned immediately from a single function call
+  * Results are returned immediately from a single function call
   * Input: image URL / binary image data, language, and optional input parameter detectOrientation
   * In the result, the text is broken down by region, then line, and then word
 * Read API
@@ -792,13 +790,6 @@ Upload image, specify the visual features you want to include in the analysis by
 * Index documents and data from a range of sources
 * Use cognitive skills to enrich index data
 * Store extracted insights in a knowledge store for analysis and integration
-
-Service tiers:
-
-* Free
-* Basic: max 15 indexes, 2GB of index data
-* Standard: enterprise-scale solutions. S, S2, S3, S3HD
-* Storage optimized: L1, L2. More latency but large indexes
 
 ---
 
