@@ -325,7 +325,7 @@ Highly-durable pull-based queue, useful for persist in-flight transactions. It h
 
 * **FIFO queue**: strict ordering, one-time processing and no duplicates. But limit of 300 messages/second. To ensure messages arrive in order, use the sequence info in the messages with Standard queues
 * **Delay queue**: postpone delivery of new messages when they're first added to the queue, default delay is 0s, max 900s. In this time, messages are invisible. For delaying individual messages rather than the entire queue, use message timers
-* **Dead letter queue**: to prevent data loss, they sideline, isolate and alayze the unsucessfully procesed messages
+* **Dead letter queue**: to prevent data loss, they sideline, isolate and analyze the unsucessfully procesed messages
   - For standard queue, standard dead letter queue should be created. For FIFO, FIFO dead letter queue
   - You should use the same AWS account to create the standard and dead letter queues
   - Both queues should be in the same region
@@ -435,7 +435,7 @@ Encryption:
 * Server side encryption (SSE), protects data at rest. For example, a bucket policy that denies S3 PUT requests that don't include the SSE parameter in the request header
   * S3 managed keys (SSE-S3): a unique key encrypts each object, and the key itself is encrypted with a master key that is regularly rotated. It uses AES-256 for encryption. The header for a request with this encryption is: `s3:x-amz-server-side-encryption": "AES256`
   * AWS KMS managed keys (SSE-KMS), KMS manages *data* key, the customer *master* key can be customer managed or created by KMS directly. `s3:x-amz-server-side-encryption": "aws-kms`
-    - This might include latency with uploads/downloads, since the KMS API calls limit ir lower than the S3 limit
+    - This might include latency with uploads/downloads, since the KMS API calls limit is lower than the S3 limit
   * Server side encryption with customer provided keys (SSE-C): customer must manage the encryption key. No code necessary to encrypt or decrypt, only necessary to manage the encryption key you provide. In each API call, the customer needs to send the keys and encryption algorithm. For this situation, if the request is made over HTTP, S3 rejects it.
 * Client side encryption: used for encryption in transit via SSL/TLS
 
@@ -483,7 +483,7 @@ Consistency only applies to read operations, which can be *query*, *scan*, *GetI
 
 1 RCU = 1 strongly consistent read/s for an item of 4kb in size. For larger files, more RCU units. Transactional reads' RCU consumption = double consistent reads = double eventual reads. WCU is 1 per 1KB/s. RCU and WCUs are specific to one table.
 
-> How many RCUs does a file of 15KB need for 100 strongly consistent reads? 15 / 4 = 4, 100*4 = 400 RCUs. For eventual consistency, 200 RCUs.
+> How many RCUs does a file of 15KB need for 100 strongly consistent reads? 15 / 4 = 4, 100\*4 = 400 RCUs. For eventual consistency, 200 RCUs.
 
 For the highest throughput questions, choose eventual consistency, maximum reads capacity * max item size. For high latency issues, use eventually consistent reads instead of strongly consistent reads.
 
