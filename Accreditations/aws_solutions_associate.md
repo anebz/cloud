@@ -1,63 +1,79 @@
 # AWS Certified solutions associate
 
+* [Udemy practice exams](https://www.udemy.com/course/aws-certified-solutions-architect-associate-amazon-practice-exams-saa-c02/)
+* [Whizlab practice exams](https://www.whizlabs.com/aws-solutions-architect-associate/)
+* [ExamTopics questions](https://www.examtopics.com/exams/amazon/aws-certified-solutions-architect-associate-saa-c02)
+
+---
+
 - [AWS Certified solutions associate](#aws-certified-solutions-associate)
 	- [Compute](#compute)
 		- [EC2](#ec2)
 			- [Autoscaling](#autoscaling)
 		- [ECS](#ecs)
 		- [Lambda](#lambda)
+		- [EMR](#emr)
+		- [Glue](#glue)
 	- [X. Storage](#x-storage)
 		- [X.Y. S3](#xy-s3)
+			- [S3 notification feature](#s3-notification-feature)
 		- [X.Y. DynamoDB](#xy-dynamodb)
-			- [Partition keys](#partition-keys)
 		- [X.Y. Aurora](#xy-aurora)
 		- [X.Y. RDS](#xy-rds)
 		- [X.Y. EBS](#xy-ebs)
+		- [Redshift](#redshift)
+	- [Security](#security)
+		- [Access management](#access-management)
+		- [Monitoring](#monitoring)
+		- [Redis](#redis)
+	- [CloudFront](#cloudfront)
+	- [Networking](#networking)
+		- [Route 53](#route-53)
+		- [Load balancers](#load-balancers)
+	- [Encryption](#encryption)
+		- [AWS Secrets manager](#aws-secrets-manager)
+	- [CloudWatch](#cloudwatch)
 	- [Messaging](#messaging)
 		- [SQS](#sqs)
 		- [MQ](#mq)
-	- [Security](#security)
-		- [Access management](#access-management)
-	- [Redis](#redis)
-	- [CloudFront](#cloudfront)
-	- [Networking](#networking)
-	- [Encryption](#encryption)
-		- [CloudTrail](#cloudtrail)
-	- [API Gateway](#api-gateway)
-	- [CloudWatch](#cloudwatch)
+		- [API Gateway](#api-gateway)
+
 
 ## Compute
 
 ### EC2
 
-Requires managing infrastructure, while Fargate, containers and kubernetes don't.
-
 Multi-AZ uses synchronous replication ensuring almost no RPO (recovery point objective). Read replicas take longer.
 
-EBS can persist independently from the life of an instance. For EBS up to 64k IOPS, chooose Nitro-based EC2 instance. Other instances guarantee up to 32k IOPS only.
+Requires managing infrastructure, while Fargate, containers and kubernetes don't.
+
+To access the instance ID, public keys and public IP address of the instances, check the instance metadata.
+
+Amazon Machine Image (AMI) provides the info required to launch an instance.
 
 If the instance has data stored in RAM and the instance has to be shut down for some time, enable hibernation and hibernate the instance before shutdown. Snapshotting the instance won't help because RAM contents are reloaded.
 
 * Standard reserved instance: more discount, can't exchange instances but can change Availability Zone, scope, network platform, or instance size.
 * Convertible reserved instance: flexibility to change families, OS types and tenancies
 
+To monitor custom metrics, you must install the CloudWatch agent on the instance.
+
+If the instance should send/receive traffic over the Internet, it should have a public IP address associated with it.
+
 #### Autoscaling
-
-Simple scaling: you have to wait for the cooldown period to complete before initiating additional scaling activities.
-
-When downscaling, Autoscaling first deletes the instance launched from the oldest launch configuration.
-
-Default termination policy in the picture below:
-
-![image.png](https://media.tutorialsdojo.com/ASG-default-policy-evaluation-flowchart.png)
-
-Target tracking policy: allows you to increase/decrease the current capacity of the group based on a target value for a specific metric, which helps with overprovisioning of resources. The scaling policy adds/removes capacity as required to keep the metric as close to the specified target value
 
 For highly available instances, deploy in at least 2 AZ. If we need to have at least 2 instances running, we need 2 AZ and 2 instances in each. Worst case, one AZ fails but we still have 2 instances running. If we only had 1 instance in the unaffected AZ, Autoscaling would deploy the second instance but it would take some time, for a while there would be only 1 instance. Which we don't want. Max. capacity is 6, 3 in each AZ.
 
 For predictable load changes, e.g. when expecting a load at 9AM when people come to work, you can configure a scheduled scaling policy to perform scaling at specified times.
 
+Cooldown period: ensures that Auto scaling group doesn't launch/terminate any instances before the previous scaling activity takes effect. Default value is 300s
+
 ### ECS
+
+Which services run the containers?
+
+* EC2 instances (which have the ECS container agent running)
+* Fargate launch type (serverless). Has less capacity than EC2
 
 ECS tasks can be run on CloudWatch events, e.g. when a file is uploaded to a certain S3 bucket using a S3 PUT operation. You can also declare a reduced number of ECS tasks whenever a file is deleted on the S3 bucket using the DELETE operation.
 
@@ -72,9 +88,26 @@ They can also handle bursts in traffic but it takes minutes to set up new contai
 
 ### Lambda
 
+You can use aliases when updating functions, to have the Lambdas versioned. This enables canary deployment (e.g. only sending 20% to the updated function)
+
 They can be used to handle bursts of traffic in seconds in serverless applications.
 
 For sensitive info in env variables, create a new KMS key and use it to enable encryption helpers that leverage on KMS to store and encrypt the sensitive info. Lambda encrypts the environment variables in the function by default, but the info is still visible to other users who have access to the Lambda console. Lambda uses a default KMS key to encrypt the variables, which is usually accessible by other users.
+
+* Provisioned concurrency: keep instances provisioned, more expensive
+* Reserved concurrency: dedicated reservations of parallel execution for your function.  This number will be subtracted from your default account soft limit of 1000 parallel executions
+	- Guarantees that this concurrency level is always possible for your function
+	- But concurency can't be exceeded
+	
+Lambda@Edge: allows you to execute code at different times when the CloudFront distribution is called
+
+### EMR
+
+Managed cluster platform for big data framework (Apache Hadoop, Spark). Processes and analyzes vast amounts of data. EMR can be used to transform and move large amounts of data into and out of other AWS datstores and dbs.
+
+### Glue
+
+AWS Glue is a serverless ETL service that crawls data, builds a data catalog, performs data preparation, transformation and ingestion. But doesn't allow the usage of big data frameworks.
 
 ## X. Storage
 
@@ -83,27 +116,39 @@ For sensitive info in env variables, create a new KMS key and use it to enable e
 * Amazon FSx For Lustre: high-performing *parallel* file system for fast processing of workloads
 * Amazon FSx For Windows File Server: fully managed Microsoft Windows filesystem with support for SMB protocol, Windows NFTS, Microsoft Active Directory integrations
 * AWS Storage gateway: integrate the on-premises network to AWS but doesn't migrate apps. If using a fileshare in Storage Gateway, the on-premises systems are still kept. Hybrid storage solutions. Enables Active Directory users to deploy storage on their workstations as a drive. mounted as a disk for on-premises desktop computers
+* AWS DataSync: upload all data to AWS, 100% cloud architecture. nothing stored on-prem.
 * EFS: only supports Linux workloads
 
-### X.Y. S3
+---
 
-To aggregate data in buckets in many locations, use Transfer Acceleration in the destination bucket and upload the collected data using Multipart upload. Uploading the data to the closest S3 bucket and setting up cross-region replication and copying objects to destination bucket works as well, but it takes longer.
+* AWS Snowball edge: type of Snowball device with on-board storage and compute power. Each Snowball Edge device can transport data at speeds faster than the internet. The AWS Snowball Edge device differs from the standard Snowball because it can bring the power of the AWS Cloud to your on-premises location, with local storage and compute functionality. Can't directly integrate backups to S3 Glacier, only to S3.
+* AWS Snowmobile exabyte-scale data transfer service. Up to 100PB per Snowmobile
+
+### X.Y. S3
 
 Amazon Macie is a ML-powered service that monitors and detects usage patterns on S3 data, it can detect anomalies, risk of unauthorized access or inadvertent data leaks. It can recognize PII (personally identifiable info) or IP.
 
 CORS (cross-origin resource sharing) allows webapps loaded in one domain to interact with resources in a different domain. For instance, to add JavaScript to the webapp.
 
-How to give access to paying subscribers to a specific files? Use Signed cookies to control who can access private files in the CloudFront distribution by modifying the app to check whether a user should have access or not. For members, send the required `SetCookie` headers to the viewer which will unlock the content only to them.
-
-Signed URLs are when you want to restrict access to individual files, or when users are using a client (e.g. HTTP client) that doesn't support cookies. With signed cookies, you can provide access to multiple restricted files but from a restricted group of users.
-
 Use pre-signed URLs to access specific objects.
+To control traffic to trusted buckets (expecting there to be a lot of buckets), set an endpoint policy. You can also create bucket policies but it takes a lot of time.
 
-For data archiving, S3 Glacier (also Glacier deep archive). One Zone-IA is for infrequent access. With lifefycle policy, you can specify that the data is moved to another storage class (like for archiving).
+S3 object lock allows you to store objects using a write-once-read-many (WORM) model. Changes to objects are allowed but their previous versions should be preserved and remain retrievable. If you enabled S3 Object Lock, you won't be able to upload new versions of an object. This feature is only helpful when you want to prevent objects from being deleted or overwritten for a fixed amount of time or indefinitely.
 
-> S3 notification feature
+* S3 Standard - Infrequent Access: is used for infrequently-accessed data, but rapid access. Not for backup
+* One Zone-IA: for infrequent access
+* S3 Glacier (+ deep archive) for archiving
 
-The S3 notification feature can send notifications when certain events happen in a bucket. S3 event notifications are designed to be delivered at least once and to one destination only. You cannot attach two or more SNS topics or SQS queues for S3 event notification. Therefore, you must send the event notification to Amazon SNS.
+With lifefycle policy, you can specify that the data is moved to another storage class (like for archiving).
+
+> Retention modes
+
+* 𝗚𝗼𝘃𝗲𝗿𝗻𝗮𝗻𝗰𝗲 - overwrites/deletes are only possible with specific rights
+* 𝗖𝗼𝗺𝗽𝗹𝗶𝗮𝗻𝗰𝗲 - no deletes or overwrites possible for the duration of the retention period
+
+#### S3 notification feature
+
+The S3 notification feature can send notifications when certain events happen in a bucket. S3 event notifications are designed to be delivered at least once and to one destination only. You cannot attach two or more SNS topics or SQS queues for S3 event notification. Therefore, you must send the event notification to Amazon SNS. SQS and Lambda are also correct destinations
 
 First add notification config saying which event should S3 publish and the destination for the notification, which can be the following:
 
@@ -115,23 +160,50 @@ First add notification config saying which event should S3 publish and the desti
 
 ### X.Y. DynamoDB
 
-DynamoDB is a NoSQL db that can handle frequent schema changes and doesn't have downtime with schema changes.
+DynamoDB is a multi-AZ, NoSQL db (suitable for key-value stores) that can handle frequent schema changes and doesn't have downtime with schema changes.
 
-DynamoDB table in on-demand capacity mode should be used for unpredictable traffic. Pricing is pay-per-request for read and write requests.
+* Provisioned capacity: specify the capacity units for the table and get billed for them. Useful foor steady load or known patterns
+* On-demand: paying per request (good for unpredictable traffic). Pricing is pay-per-request for read and write requests.
 
-Changes in a table (create, update, delete) can be sent to a DynamoDB stream. This stream can be read b Lambda.
+A document in DynamoDB doesn't have a fixed schema. Each table defines the primary key, the unique identifier for each table and it must be provided when inserting a new item:
+
+* Simple (single field): also the partition key
+* Composite: build-up via the partition and range key. Range key can be used with expressions
+
+Internally, DynamoDB has different partitions where the items are stored. The partition key runs through a hash function whose result determines the partition. A good partition should be equally distributed.
+
+This is important because the read/write capacity units are distributed among partitions. If items aren't well distributed, your requests are more likely of being throttled because you'll have hot partitions /partitions receiving high load).
+
+* Query: looks for items at a specific partition. You're billed only for the retrieved items. Query works on indexes (partition & range key, if any). Cheaper and faster than a scan.
+* Scan: runs through the table looking for items that match your expression. You're billed by the items that are scanned
+
+---
+
+Secondary indexes
+
+* Local (local secondary index - LSI): needs to have the same hash/partition key, but an alternative range key. max 5 per table
+* Global (GSI): partition & range key can be different. max 20 per table
+
+---
+
+Backups:
+
+* On-demand: regularly trigger on-demand backups. A lambda function that triggers backups via aws-sdk. EventBridge rule that invokes the function regularly
+* Continuous backups via point-in-time-recovery: more costly, allows you to restore the table to any state within the last 35 days.
+
+With global tables, you can have synchronized tables in different regions.
+
+CloudWatch by default captures: user read capacity units, user write capacity units, throttles
 
 DynamoDB and ElastiCache provide high performance storage of key-value pairs.
 
-DynamoDB Stream is an ordered flow of info about changes to items in a table. When enabling stream on a table, DynamoDB captures info about every modification to data items in the table. A stream record contains info about data modifications. You can configure the stream so that the record captures additioanl info, e.g. the before/after images of modified items. You can set up triggers so that a specific change in a table triggers a Lambda function.
+DynamoDB Stream allows the invocation of other services if items are created/updated/deleted. A stream record contains info about data modifications. You can configure the stream so that the record captures additioanl info, e.g. the before/after images of modified items. You can set up triggers so that a specific change in a table triggers a Lambda function.
 
 ![image.png](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/images/StreamsAndTriggers.png)
 
-#### Partition keys
+![keys.png](https://img-c.udemycdn.com/redactor/raw/2018-10-23_05-24-29-74b3e6dadc8ce683ccd2a5bd00f99889.png)
 
-To improve performance by distributing the workload evenly and using the provisioned throughput efficiently, use partition keys with high-cardinality attributes, which have a large number of dinstinct values for each item.
-
-The partition key portion of a table's primary key determines the logical partitions in which a table's data is stored. This in turn affects the underlying physical partitions. Provisioned I/O capacity for the table is divided evenly among these physical partitions. Therefore a partition key design that doesn't distribute I/O requests evenly can create "hot" partitions that result in throttling and use your provisioned I/O capacity inefficiently. You should also design the partition-key system efficiently, with the info in the previous paragraph.
+By default, tables are encrypted with KMS. You can use a customer-managed key (CMK).
 
 
 
@@ -149,11 +221,13 @@ Aurora Global db is designed for globally distributed apps. It supports storage-
 
 ### X.Y. RDS
 
-To monitor RDS, enable Enhanced Monitoring in RDS. By default these logs are stored in CloudWatch for 30 days
-
 If an instance of RDS in 1 AZ fails very often, enable Multi-AZ deployment, which has synchronous replication. Making a snapshot allows a backup, but it doesn't provide immediate availability in case of AZ failure.
 
+In a Multi-AZ db if the primary db fails, the canonical name record (CNAME) switches from the primary to standby instance.
+
 ### X.Y. EBS
+
+They can only be attached to instances in the same AZ.
 
 | Features | SSD | HDD |
 |-|-|-|
@@ -165,20 +239,17 @@ If an instance of RDS in 1 AZ fails very often, enable Multi-AZ deployment, whic
 * General purpose
 * Provisioned IOPS: I/O intensive
 * Throughput optimized: large operations (large data)
+* For infrequently accessed data, always cold HDD
 
-## Messaging
+To back up all EBS volumes, use Amazon Data lifecycle manager (DLM) to automate the creation of snapshots.
 
-### SQS
+EBS volumes spport live config changes in production, you can change volume type, size and IOPS capacity without service interruptions.
 
-SQS polling is not real time. If we receive empty messages when polling, enable long polling: set ReceiveMessageWaitTimeSeconds to higher than 0. In long polling, SQS waits until a message is available before sending a response to a ReceiveMessage request.
+EBS volumes are off-instance, they can persist independently from the life of an instance.
 
-SNS works real-time. Lambda is a valid subscriber. EventBridge is not a valid SNS destination
+### Redshift
 
-### MQ
-
-MQ is used for migrating messaging services to the cloud quickly and easily.
-
-Managed message broker service for Apache ActiveMQ that makes it easy to set up and operate message brokers in the cloud and hybrid architecture. The user case is when migraing to a managed message broker to automate software administration and maintenance, without having to re-write existing applications.
+Cloud data warehouse, it allows SQL and BI tools. You can run complex analytic queries against TB or PT of structured/semi-structured data.
 
 ## Security
 
@@ -189,9 +260,21 @@ Managed message broker service for Apache ActiveMQ that makes it easy to set up 
 	- Shield advanced: additional detection and mitigation. Near real-time visibility into attacks, integration with WAF
 * WAF: blocks common attack patterns such as SQL injection or cross-site scripting
 	- AWS Firewall manager: simplify WAF administration and maintenance tasks across multiple accounts and resources
-	- If there are external requests to a website from multiple systems with IPs that constantly change, create a rate-based rule in WAF and associate the web ACL to an ALB
+	- To mitigate DDoS: create a cloudfront distribution, set an ALB as origin. Create a rate-based ACL rule using WAF and associate it to the cloudfront
 
 ### Access management
+
+Default policy is everything denied, this is overruled by an explicit allow. This is overruled by an explicit deny. Each policy contains 1+ statements. Statement contains:
+
+* Effect: allow/deny
+* Action: list of actions
+* Resource: list of resources for which the actions are granted
+
+Policies can be:
+
+* Identity based: attached to a user/group/role
+* Resource based: attached to a resource
+	- Needs a principal: for which account/user/role is getting the effect
 
 If a company is using Active Directory in their on-premise system, AWS Directory Service AD connector for easier integration. If the roles on-prem are already assigned using groups, in AWS use IAM roles or use Microsoft AD federation service.
 
@@ -201,17 +284,26 @@ IAM groups is a collection os IAM users that lets you specify permissions for mu
 
 To manage AWS resources centrally, use AWS organizations and AWS RAM (resource access manager) which enables you to share resources with any account or within organizations. You can share AWS Transit Gateways, Subnets, AWS License Manager configurations, and Amazon Route 53 Resolver rules resources with RAM.
 
-IAM doesn't allow MFA.
-
 MySQL and PostgreSQL dbs instance can be authenticated with IAM DB authentication and then you only need an authentication token to access it.
 
-For temporary credentials, use Single-Sign-on: users can log in from their on-prem AD or LDAP directory: set up a federation proxy or an identity provider and use AWS STS (security token service) to generate temporary tokens.
+[awsu.me](https://awsu.me) is a CLI tool to work with different roles in AWS.
 
-## Redis
+* *Trusted advisor*: reviews permissions for unnecessary rights or best practice violations and checks that you've enabled AWS security features for services.
+* *Policy simulator*: build, validate and troubleshoot policies.
+
+### Monitoring
+
+* CloudTrail: check who made changes to AWS resources
+* AWS Config: assesses, audits and evaluates resources. Can automate the evaluation of recorded configs against desired configs. By creating an AWS Config rule, you can enforce your ideal configuration in your AWS account
+	- CloudTrail can track changes, can't enforce rules to comply with your policies
+
+### Redis
 
 If users need to authenticate, use Redis AUTH by creating a new Redis Cluster with bot hthe `--transit-encryption-enabled` and `--auth-token` parameters enabled. The second parameters asks users for a password.
 
 ## CloudFront
+
+Low-latency and high-transfer speed content delivery network
 
 To block access for certain coutries, use CloudFront geo restriction.
 
@@ -221,18 +313,53 @@ If users around the world have HTTP 504 errors, set up an origin failover by cre
 
 You can also deploy the app to multiple AWS regions and set up a Route53 record with latency routing policy to route incoming traffic to the region that provides the best latency, but this has more costs.
 
+* Lambda@Edge: run general-purpose code on regional edge locations. Executed in one of AWS' 13 regional edge caches. Supports JS/Python, 5s (viewer), 30s (origin triggers), max memory is 128MB (viewer) & 10GB (origin), has network access. Used in scenarios:
+	- Viewer request/response: invoked at the start/end of all requests
+	- Origin request/response: only when cloudfront requests the origin/retrieves a response
+* Cloudfront functions: lightweight version of Lambda@Edge, less capabilities but better latency and cheaper. Executed in one of 218 edge locations. Used for access control & authorization, HTTP redirects, cache manipulation.
+	- Supports JS, max exec time is 1ms, max memory is 2MB, has no network access.
+
 ## Networking
 
 To check all healthy instances, use multivalue answer routing policy to help distribute DNS responses across multiple resources. For example, use multivalue answer routing when you want to associate your routing records with a Route 53 health check.
 
-AWS Site-to-Site VPN: to connect on-prem and AWS, cheap option with limited bandwidth and limited traffic
+> VPN
+
+AWS Site-to-Site VPN: to connect on-prem and AWS, cheap option with limited bandwidth and limited traffic.
+
+To connect from on-prem to VPCs with a VPN, the customer side needs a Customer Gateway.
+
+![networking.png](https://img-c.udemycdn.com/redactor/raw/2018-10-27_22-45-01-dbcb3de60063eaba73e8d2d12c61d6dc.png)
+
+### Route 53
+
+DNS web service, it redirects traffic via domain names to your apps. (DNS == resolving domains into their IP addresses.) 3 main functions:
+
+* Domain registration
+* DNS routing (from example.com to the IP address, from an email account to the email server, from a subdomain to the IP address)
+	- Simple routing: used for single resources that are performing given functions in your domain. Can't create multiple records with the same name for this type
+	- Weighted routing: you can define multiple records for the same (sub-)domain name and let you choose how much traffic is routed to each one of them. Useful for load balancing
+	- Geolocation routing: route traffic based on the grographic location of users
+	- Geoproximity routing: routes traffic based on the geographic location of the users+resources. By specifying *bias*, you can choose how much of the traffic should be routed
+	- Latency routing: serves user requests from the AWS region with lowest latency. Users from the same location might get sent to different regions
+	- Health checking
+
+Each record includes the name of the (sub)domain, a record type (A, MX..) and other info.
+
+---
+
+To set up DNS failover to a static website, use Route 53 with the failover option to a static S3 website bucket or CloudFront distribution.
+
+To route traffic to a website hosted on a S3 bucket: the bucket should be configured to host a static website, the bucket name = domain/subdomain name. You need a registered domain name (you can use Route 53 for that), and Route 53 must be the DNS service for the domain.
 
 Security groups are stateful, everything is blocked by default. the security group specifies what's allowed.
 
-To give access only to the IP: 110.238.98.71 via SSH, make a security group inbound rule: protocol TCP, Port range - 22, source 110.238.98.71/32. /32 denotes one IP address, /0 denotes the entire network. SSH protocol uses TCP and port 22.
-
 VPC endpoints for Amazon S3 provide secure connections to S3 buckets that do not require a
 gateway or NAT instances.
+
+To create an IPv6 subnet, you need to create IPv4 subnet first.
+
+For 2 EC2 instances inside a VPC to communicate (each instance in its own subnet), the Network ACL should allow communication between the 2 subnets and the security groups allow the app host to communicate to the other instance on the right port and protocol.
 
 The online application must be in public subnets to allow access from clients' browsers. The database cluster must be in private subnets to meet the requirement that there be no access from the Internet. A NAT Gateway is gives private subnets access to the Internet. **NAT Gateways must be deployed in public subnets.** For resouces in various AZs, to improve resilieny, create one NAT Gateway per AZ and configure routing so that resources use the NAT in their AZ.
 
@@ -240,26 +367,111 @@ An ALB sends requests to healthy instances only. It performs periodic health che
 
 An ENI (elastic network interface) is a logical networking component in a VPC that represents a virtual network card. It includes a primary private IPv4 address, 1+ secondary private IPv4 addresses, 1 Elastic IPv4 per private IPv4 address, 1 public IPv4, 1+ IPv6.
 
+To route traffic to an ELB load balancer, use Route 53, create an alias record that points to the LB. It's similar to the CNAME record but o can create the alias record for the root domain + subdomains (CNAME can only be used for subdomains). To enable IPv6 resolution, create a second resource record
+
+* Alias with type "MX" record set: for mail servers
+* Alias with type "CNAME" record set: can't be created for zone apex
+* Non-Alias with type "A" record set: for IP addresses
+* Alias type with "A" record set: for domains
+* Alias type with "AAAA" record set: for subdomains
+
+---
+
+> 2 VPCs with peering connections with each other
+
+Peering connection is just within the VPCs, not with the connections that the other VPC has.
+
+> Windows Bastion
+
+A bastion host is a special purpose computer on a network specifically designed and configured to withstand attacks, it's equivalent to an EC2 instance. It should be in a public subnet with either a public or Elastic IP address with sufficient RDP or SSH access defined in the security group. Users log on to the bastion host via SSH or RDP and then use that session to manage other hosts in the private subnets.
+
+The best way to implement a bastion is to create a small EC2 instance which only has a security group only allowing access on port 22 from a particular IP address for maximum security. This blocks any SSH brute force attacks on the host. Use a private key (.pem) file to connect to the host. Recommended to create a small instance, since this only acts as a jump server to connect to other instances.
+
+> Elastic IP address
+
+Static IPv4 (can only connecto to NLB) address masks the failure of an instance by rapidly remapping the address to another instance. You can also specify the elastic IP in a DNS record of your domain, so that your domain points to your instance.
+
+Can be used to use the trusted IPs as Elastic IP addresses (EIP) to the NLB.
+
+### Load balancers
+
+* Network load balancer: 4th layer of the OSI model
+* Application load balancer: supports path-based routing, host-based routing, bi-directional communication with WebSockets
+
 ## Encryption
 
 If the encryption keys must be stored on premises, use SSE-C (server-side, customer provided keys) but in this case the key is sent to AWS as part of the request. or use client-side encryption to provide at-rest encryption.
 
 If the master key and the unencrypted data can't be sent to AWS, we need client-side encryption.
 
-KMS with CMK in a custom key store and storing the non-extractble key material in CloudHSM: allows you to have full control of the encryption of the created key and audit key usage in CloudTrail.
+Client-side encryption means encrypting data before sending it to AWS.
 
-### CloudTrail
+### AWS Secrets manager
 
-Logging system to track all changes in all regions: set up a new CloudTrail trail in a new S3 bucket using CLI and pass the `--is-multi-region-trail` and `--include-global-service-events` parameters, then encrypt log files using KMS encryption.
-
-## API Gateway
-
-Amazon API Gateway provides throttling at multiple levels including global and by a service call. Throttling limits can be set for standard rates and bursts. For example, API owners can set a rate limit of 1,000 requests per second for a specific method in their REST APIs, and also configure Amazon API Gateway to handle a burst of 2,000 requests per second for a few seconds
-
-API Gateway can scale using AWS Edge locations, but for bursts of API, you need to configure **throttling limits**. Any request over the limit will receive a 429 HTTP response.
+Secrets can be db credentials, passwords, API keys etc. It allows automatic rotation for all the credentials. Secrets Manager enables you to replace hardcoded credentials with an API call to the Secrets Manager.
 
 ## CloudWatch
 
 CloudWatch by default monitors CPU, network and disk read activity on EC2 instances. To get memory utilization, need to have a custom metric.
 
 Install the CloudWatch agent in the EC2 instances that gathers all the metrics (memory usage for ex.). View the custom metrics in the CloudWatch console.
+
+## Messaging
+
+### SQS
+
+Decouples downstream operations that don't need to be synchronous. Messages for Lambda triggers can be aggregated together into batches, so one function invocation processes several messages at a time. Messages can contain up to 256kbs of text and can be in json/xml format.
+
+SQS polling is not real time. If we receive empty messages when polling, enable long polling: set ReceiveMessageWaitTimeSeconds to higher than 0. In long polling, SQS waits until a message is available before sending a response to a ReceiveMessage request.
+
+SNS works real-time. Lambda is a valid subscriber. EventBridge is not a valid SNS destination
+
+For users with different priority, create one SQS queue for each priority type. Consume messages from the high priority queue until it's empty, then the lower priority queue.
+
+You cannot set a priority to individual items in the queue.
+
+* Standard queue: guarantees that messages are delivered at least once, no guarantee for order
+* FIFO: limit 300 transactions/s, guarantees ordering, guarantees one-time processing of all messages, support for message groups
+
+With Message groups and their identifiers, messages with the same ID are processed in order. Useful for processing messages of the same customer in order. Messages for one customer are delivered in FIFO, but messages for other customers are in parallel and FIFO is not guaranteed.
+
+Visibility timeout: message is hidden from other consumers while it's being processed. If successfully processed, deleted. Else, message available again. Default timeout is 30s, max 12h.
+
+SQS has a retention period from 1 minute to 14 days, default is 4 days. After that, messages are deleted.
+
+DLQ: dead letter queues: if a message is considered unprocessable, it's sent to this queue. This helps unblock messaging systems without losing messages.
+
+Max in-flight msgs 120k, for FIFO 20k.
+
+
+### MQ
+
+MQ is used for migrating messaging services to the cloud quickly and easily.
+
+Managed message broker service for Apache ActiveMQ that makes it easy to set up and operate message brokers in the cloud and hybrid architecture. The user case is when migraing to a managed message broker to automate software administration and maintenance, without having to re-write existing applications.
+
+### API Gateway
+
+Enables you to build RESTful APIs and WebSocket APIs optimized for serverless workloads. You pay only for the API calls you receive and the amount of data transferred out.
+
+API Gateway has three major parts:
+
+* Request flow: authentication, authorization
+* Integration (what the client wants to do), e.g. a Lambda function
+* Response flow: what happens after the integration, e.g. transformation
+
+*Authorizer*s protect routes of the API. Protects downstream services and allows forwarding a security context, e.g. the details of an authenticated user. [More info on twitter thread](https://twitter.com/tpschmidt_/status/1466079626749526021)
+
+---
+
+Amazon API Gateway provides throttling at multiple levels including global and by a service call. Throttling limits can be set for standard rates and bursts. For example, API owners can set a rate limit of 1,000 requests per second for a specific method in their REST APIs, and also configure Amazon API Gateway to handle a burst of 2,000 requests per second for a few seconds
+
+API Gateway can scale using AWS Edge locations, but for bursts of API, you need to configure throttling limits. Any request over the limit will receive a 429 HTTP response.
+
+
+
+
+---
+
+* SSO: single sign-on, central management of access to AWS accounts and resources
+* STS: security token service, create temporary credentials for AWS resources
