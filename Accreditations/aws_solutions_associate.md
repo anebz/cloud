@@ -3,6 +3,8 @@
 * [Udemy practice exams](https://www.udemy.com/course/aws-certified-solutions-architect-associate-amazon-practice-exams-saa-c02/)
 * [Whizlab practice exams](https://www.whizlabs.com/aws-solutions-architect-associate/)
 * [ExamTopics questions](https://www.examtopics.com/exams/amazon/aws-certified-solutions-architect-associate-saa-c02)
+* [DataCumulus courses](https://courses.datacumulus.com/)
+* [AWS FAQs](https://aws.amazon.com/faqs/)
 
 ---
 
@@ -45,7 +47,7 @@
 
 Multi-AZ uses synchronous replication ensuring almost no RPO (recovery point objective). Read replicas take longer.
 
-Requires managing infrastructure, while Fargate, containers and kubernetes don't.
+Billing for on-demand is only when instance is not pending anymore and it's running. You won't be billed if the instance is stopping. For spot instances, you're not billed if the instance is in stopping state. For reserved instances, you're billed until the end of the term, even if it's terminated.
 
 To access the instance ID, public keys and public IP address of the instances, check the instance metadata.
 
@@ -60,13 +62,21 @@ To monitor custom metrics, you must install the CloudWatch agent on the instance
 
 If the instance should send/receive traffic over the Internet, it should have a public IP address associated with it.
 
+If you start and stop an EC2 instance, the EBS volume associated with it is preserved but the data is erased. Also, the underlying host for the instance is also possibly changed. The Elastic IP address remains associated with the instance, and the ENI (elastic network interface) stays attached as well.
+
+If you purchased a reserved instance but you want to stop it, terminate the RI asap to avoid getting billed at the on-demand price when it expires and go to AWS RI marketplace and sell it. 
+
+There is a vCPU-based on-demand instance limit per region, if you want more you can submit the limit increase form to AWS and retry the failed requests once approved.
+
 #### Autoscaling
 
 For highly available instances, deploy in at least 2 AZ. If we need to have at least 2 instances running, we need 2 AZ and 2 instances in each. Worst case, one AZ fails but we still have 2 instances running. If we only had 1 instance in the unaffected AZ, Autoscaling would deploy the second instance but it would take some time, for a while there would be only 1 instance. Which we don't want. Max. capacity is 6, 3 in each AZ.
 
 For predictable load changes, e.g. when expecting a load at 9AM when people come to work, you can configure a scheduled scaling policy to perform scaling at specified times.
 
-Cooldown period: ensures that Auto scaling group doesn't launch/terminate any instances before the previous scaling activity takes effect. Default value is 300s
+Cooldown period: ensures that Auto scaling group doesn't launch/terminate any instances before the previous scaling activity takes effect. Default value is 300s.
+
+If there is a new AMI, create a new autoscaling launch configuration. Autoscaling uses this to launch instances.
 
 ### ECS
 
@@ -109,13 +119,17 @@ Managed cluster platform for big data framework (Apache Hadoop, Spark). Processe
 
 AWS Glue is a serverless ETL service that crawls data, builds a data catalog, performs data preparation, transformation and ingestion. But doesn't allow the usage of big data frameworks.
 
+### Fargate
+
+Useful for microservices and launching containers in a serverless way, also helps with container cluster management. For ECS & Fargate, specify CPU and memory at the task definition
+
 ## X. Storage
 
 ![image.png](http://media.tutorialsdojo.com/aws-storage-services.png)
 
 * Amazon FSx For Lustre: high-performing *parallel* file system for fast processing of workloads
-* Amazon FSx For Windows File Server: fully managed Microsoft Windows filesystem with support for SMB protocol, Windows NFTS, Microsoft Active Directory integrations
-* AWS Storage gateway: integrate the on-premises network to AWS but doesn't migrate apps. If using a fileshare in Storage Gateway, the on-premises systems are still kept. Hybrid storage solutions. Enables Active Directory users to deploy storage on their workstations as a drive. mounted as a disk for on-premises desktop computers
+* Amazon FSx For Windows File Server: fully managed Microsoft Windows filesystem with support for SMB protocol, Windows NFTS, Microsoft Active Directory integrations. Useful for app workloads that require shared file storage.
+* AWS Storage gateway: integrate the on-premises network to AWS but doesn't migrate apps. If using a fileshare in Storage Gateway, the on-premises systems are still kept. Hybrid storage solutions. Enables Active Directory users to deploy storage on their workstations as a drive. mounted as a disk for on-premises desktop computers. To access the data moved to S3, use File Gateway, not S3 API.
 * AWS DataSync: upload all data to AWS, 100% cloud architecture. nothing stored on-prem.
 * EFS: only supports Linux workloads
 
@@ -128,6 +142,8 @@ AWS Glue is a serverless ETL service that crawls data, builds a data catalog, pe
 
 Amazon Macie is a ML-powered service that monitors and detects usage patterns on S3 data, it can detect anomalies, risk of unauthorized access or inadvertent data leaks. It can recognize PII (personally identifiable info) or IP.
 
+S3 select: retrieve only a subset of the data by using simple SQL expressions
+
 CORS (cross-origin resource sharing) allows webapps loaded in one domain to interact with resources in a different domain. For instance, to add JavaScript to the webapp.
 
 Use pre-signed URLs to access specific objects.
@@ -138,6 +154,7 @@ S3 object lock allows you to store objects using a write-once-read-many (WORM) m
 * S3 Standard - Infrequent Access: is used for infrequently-accessed data, but rapid access. Not for backup
 * One Zone-IA: for infrequent access
 * S3 Glacier (+ deep archive) for archiving
+	- Expedited retrieval: allows you to quickly access data if you have an urgent request. Provisioned capacity ensures that retrieval capacity for expedited retrievals is available when you need it.
 
 With lifefycle policy, you can specify that the data is moved to another storage class (like for archiving).
 
@@ -145,6 +162,11 @@ With lifefycle policy, you can specify that the data is moved to another storage
 
 * 𝗚𝗼𝘃𝗲𝗿𝗻𝗮𝗻𝗰𝗲 - overwrites/deletes are only possible with specific rights
 * 𝗖𝗼𝗺𝗽𝗹𝗶𝗮𝗻𝗰𝗲 - no deletes or overwrites possible for the duration of the retention period
+
+To securely serve private content via CloudFront:
+
+* Require that users access the private content by using special CloudFront signed URLs or signed cookies
+* Requre that users access S3 content via cloudfront urls, not s3 urls. set up an origin access identity (OIA) for the bucket and give it permission to read files in the bucket
 
 #### S3 notification feature
 
@@ -177,9 +199,11 @@ This is important because the read/write capacity units are distributed among pa
 * Query: looks for items at a specific partition. You're billed only for the retrieved items. Query works on indexes (partition & range key, if any). Cheaper and faster than a scan.
 * Scan: runs through the table looking for items that match your expression. You're billed by the items that are scanned
 
+To keep shared data updated in real time where users from around the world submit data, use AppSync with DynamoDB
+
 ---
 
-Secondary indexes
+Secondary indexes:
 
 * Local (local secondary index - LSI): needs to have the same hash/partition key, but an alternative range key. max 5 per table
 * Global (GSI): partition & range key can be different. max 20 per table
@@ -206,7 +230,6 @@ DynamoDB Stream allows the invocation of other services if items are created/upd
 By default, tables are encrypted with KMS. You can use a customer-managed key (CMK).
 
 
-
 ### X.Y. Aurora
 
 Relational db, supports dynamic storage scaling and can conduct table joins. Automatically scales to accomodate data growth.
@@ -219,11 +242,18 @@ Non serverless clusters use the *provisioned* db engine mode.
 
 Aurora Global db is designed for globally distributed apps. It supports storage-based replication (RPO) with a latency of <1s. If there's an unplanned outage, one of the secondary regions you assigned can be promoted to read and write capabilities (RPO) in <1min.
 
+* Reader endpoint: load-balances each connection request among the Aurora replicas
+* Cluster/writer endpoint: connects to the primary db instance, used for write operations
+
 ### X.Y. RDS
 
 If an instance of RDS in 1 AZ fails very often, enable Multi-AZ deployment, which has synchronous replication. Making a snapshot allows a backup, but it doesn't provide immediate availability in case of AZ failure.
 
 In a Multi-AZ db if the primary db fails, the canonical name record (CNAME) switches from the primary to standby instance.
+
+RDS has storage autoscaling to scale storage capacity with zero downtime.
+
+* ElastiCache: caches database query results
 
 ### X.Y. EBS
 
@@ -245,7 +275,7 @@ To back up all EBS volumes, use Amazon Data lifecycle manager (DLM) to automate 
 
 EBS volumes spport live config changes in production, you can change volume type, size and IOPS capacity without service interruptions.
 
-EBS volumes are off-instance, they can persist independently from the life of an instance.
+EBS volumes are off-instance, they can persist independently from the life of an instance. To prevent EBS from being deleted when an instance terminates, set the value of DeleteOnTermination to False.
 
 ### Redshift
 
@@ -323,13 +353,24 @@ You can also deploy the app to multiple AWS regions and set up a Route53 record 
 
 To check all healthy instances, use multivalue answer routing policy to help distribute DNS responses across multiple resources. For example, use multivalue answer routing when you want to associate your routing records with a Route 53 health check.
 
-> VPN
+Inbound rules for EC2 instances are evaluated starting the lowest numbered rule:
+
+* If rule #100 says allow and rule #* says deny, #100 is evaluated first -> allow. if source is allowed on rule #100, it won't further evaluate rule #101 etc.
+
+### VPN
+
+A VPN allows you will be able to connect your Amazon VPC to other remote networks securely using private sessions with IP security (IPSec) or transport layer security (TLS) tunnels.
 
 AWS Site-to-Site VPN: to connect on-prem and AWS, cheap option with limited bandwidth and limited traffic.
 
 To connect from on-prem to VPCs with a VPN, the customer side needs a Customer Gateway.
 
 ![networking.png](https://img-c.udemycdn.com/redactor/raw/2018-10-27_22-45-01-dbcb3de60063eaba73e8d2d12c61d6dc.png)
+
+* Security group: firewall for EC2 instances
+	- Supports allow rules only
+* NACL (network access control list): firefall for associated subnets
+	- Supports allow + deny rules
 
 ### Route 53
 
@@ -343,6 +384,8 @@ DNS web service, it redirects traffic via domain names to your apps. (DNS == res
 	- Geoproximity routing: routes traffic based on the geographic location of the users+resources. By specifying *bias*, you can choose how much of the traffic should be routed
 	- Latency routing: serves user requests from the AWS region with lowest latency. Users from the same location might get sent to different regions
 	- Health checking
+		+ Active-active failover: when you want all of your resources to be available the majority of the time. When a resource becomes unavailable, Route 53 can detect that it's unhealthy and stop including it when responding to queries.
+		+ Active-passive failover: when you want a primary resource or group of resources to be available the majority of the time and you want a secondary resource or group of resources to be on standby in case all the primary resources become unavailable. 
 
 Each record includes the name of the (sub)domain, a record type (A, MX..) and other info.
 
@@ -356,6 +399,10 @@ Security groups are stateful, everything is blocked by default. the security gro
 
 VPC endpoints for Amazon S3 provide secure connections to S3 buckets that do not require a
 gateway or NAT instances.
+
+### Subnets
+
+Each subnet maps to a single AZ, and each subnet is automatically associated with the main route table for the VPC.
 
 To create an IPv6 subnet, you need to create IPv4 subnet first.
 
@@ -376,6 +423,8 @@ To route traffic to an ELB load balancer, use Route 53, create an alias record t
 * Alias type with "AAAA" record set: for subdomains
 
 ---
+
+To allow only clients connecting from the IP addres XXX should have access to the host, set the security group inbound rule, protocol tcp, range-22, source XXX/32. /32 is to specify one IP address, /0 refers to the entire network.
 
 > 2 VPCs with peering connections with each other
 
@@ -415,6 +464,16 @@ Secrets can be db credentials, passwords, API keys etc. It allows automatic rota
 CloudWatch by default monitors CPU, network and disk read activity on EC2 instances. To get memory utilization, need to have a custom metric.
 
 Install the CloudWatch agent in the EC2 instances that gathers all the metrics (memory usage for ex.). View the custom metrics in the CloudWatch console.
+
+## Kinesis
+
+Kinesis data streams is an ordered sequence of data records meant to be written to and read from in real-time. Data records are temporarily stored in shards in the stream, default is 24h.
+
+Kinesis data firehose loads streaming data into data stores and analytics tools e.g. S3, Redshift, Elasticsearch, Splunk.
+
+## AWS Backup
+
+Centralized backup service, can be used with a retention of X days.
 
 ## Messaging
 
