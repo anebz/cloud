@@ -5,6 +5,7 @@
 * [ExamTopics questions](https://www.examtopics.com/exams/amazon/aws-certified-solutions-architect-associate-saa-c02)
 * [DataCumulus courses](https://courses.datacumulus.com/)
 * [AWS FAQs](https://aws.amazon.com/faqs/)
+* [TutorialsDojo AWS cheatsheets](https://tutorialsdojo.com/aws-cheat-sheets/)
 
 ---
 
@@ -78,6 +79,8 @@ Cooldown period: ensures that Auto scaling group doesn't launch/terminate any in
 
 If there is a new AMI, create a new autoscaling launch configuration. Autoscaling uses this to launch instances.
 
+If you need at least 6 instances, deploy 3x3x3 (3 in each AZ). If one AZ goes down, you still have 6 instances running. Also it's low-cost because there's 9 instances running in total. If you need at least 4 instances, deploy 2x2x2.
+
 ### ECS
 
 Which services run the containers?
@@ -111,6 +114,8 @@ For sensitive info in env variables, create a new KMS key and use it to enable e
 	
 Lambda@Edge: allows you to execute code at different times when the CloudFront distribution is called
 
+Step functions: serverless orchestration, coordinates AWS services into serverless workflows.
+
 ### EMR
 
 Managed cluster platform for big data framework (Apache Hadoop, Spark). Processes and analyzes vast amounts of data. EMR can be used to transform and move large amounts of data into and out of other AWS datstores and dbs.
@@ -129,9 +134,9 @@ Useful for microservices and launching containers in a serverless way, also help
 
 * Amazon FSx For Lustre: high-performing *parallel* file system for fast processing of workloads
 * Amazon FSx For Windows File Server: fully managed Microsoft Windows filesystem with support for SMB protocol, Windows NFTS, Microsoft Active Directory integrations. Useful for app workloads that require shared file storage.
-* AWS Storage gateway: integrate the on-premises network to AWS but doesn't migrate apps. If using a fileshare in Storage Gateway, the on-premises systems are still kept. Hybrid storage solutions. Enables Active Directory users to deploy storage on their workstations as a drive. mounted as a disk for on-premises desktop computers. To access the data moved to S3, use File Gateway, not S3 API.
-* AWS DataSync: upload all data to AWS, 100% cloud architecture. nothing stored on-prem.
-* EFS: only supports Linux workloads
+* AWS Storage gateway: integrate the on-premises network to AWS but doesn't migrate apps, used for hybrid cloud storage. If using a fileshare in Storage Gateway, the on-premises systems are still kept. Enables Active Directory users to deploy storage on their workstations as a drive. mounted as a disk for on-premises desktop computers. To access the data moved to S3, use File Gateway, not S3 API.
+* AWS DataSync: upload all data to AWS, 100% cloud architecture. nothing stored on-prem. Used for replication of data to and from AWS storage services
+* EFS: only supports Linux workloads, allow concurrent connections from multiple instances hosted on multiple AZs.
 
 ---
 
@@ -140,11 +145,13 @@ Useful for microservices and launching containers in a serverless way, also help
 
 ### X.Y. S3
 
-Amazon Macie is a ML-powered service that monitors and detects usage patterns on S3 data, it can detect anomalies, risk of unauthorized access or inadvertent data leaks. It can recognize PII (personally identifiable info) or IP.
-
-S3 select: retrieve only a subset of the data by using simple SQL expressions
+* Amazon Macie is a ML-powered service that monitors and detects usage patterns on S3 data, it can detect anomalies, risk of unauthorized access or inadvertent data leaks. It can recognize PII (personally identifiable info) or IP.
+* Amazon Athena: analyze data directly in S3 using standard SQL. Can work on many objects
+* S3 select: retrieve only a subset of the object by using simple SQL expressions
 
 CORS (cross-origin resource sharing) allows webapps loaded in one domain to interact with resources in a different domain. For instance, to add JavaScript to the webapp.
+
+To make all objects public to the Internet, configure the bucket policy to set all objects to pubic read. Grant public access to the object when uploading it using the console.
 
 Use pre-signed URLs to access specific objects.
 To control traffic to trusted buckets (expecting there to be a lot of buckets), set an endpoint policy. You can also create bucket policies but it takes a lot of time.
@@ -155,6 +162,7 @@ S3 object lock allows you to store objects using a write-once-read-many (WORM) m
 * One Zone-IA: for infrequent access
 * S3 Glacier (+ deep archive) for archiving
 	- Expedited retrieval: allows you to quickly access data if you have an urgent request. Provisioned capacity ensures that retrieval capacity for expedited retrievals is available when you need it.
+	- Glacier supports vault lock policy, which helps enforce regulatory and compliance requirements
 
 With lifefycle policy, you can specify that the data is moved to another storage class (like for archiving).
 
@@ -167,6 +175,8 @@ To securely serve private content via CloudFront:
 
 * Require that users access the private content by using special CloudFront signed URLs or signed cookies
 * Requre that users access S3 content via cloudfront urls, not s3 urls. set up an origin access identity (OIA) for the bucket and give it permission to read files in the bucket
+
+Server access logs for S3 buckets provide detailed records for the requests that are made to an S3 bucket, e.g. requester, bucket name, request time, request action, referrer etc.
 
 #### S3 notification feature
 
@@ -192,14 +202,14 @@ A document in DynamoDB doesn't have a fixed schema. Each table defines the prima
 * Simple (single field): also the partition key
 * Composite: build-up via the partition and range key. Range key can be used with expressions
 
-Internally, DynamoDB has different partitions where the items are stored. The partition key runs through a hash function whose result determines the partition. A good partition should be equally distributed.
-
-This is important because the read/write capacity units are distributed among partitions. If items aren't well distributed, your requests are more likely of being throttled because you'll have hot partitions /partitions receiving high load).
+Internally, DynamoDB has different partitions where the items are stored. The partition key runs through a hash function whose result determines the partition. A good partition should be equally distributed. This is important because the read/write capacity units are distributed among partitions. If items aren't well distributed, your requests are more likely of being throttled because you'll have hot partitions /partitions receiving high load).
 
 * Query: looks for items at a specific partition. You're billed only for the retrieved items. Query works on indexes (partition & range key, if any). Cheaper and faster than a scan.
 * Scan: runs through the table looking for items that match your expression. You're billed by the items that are scanned
 
-To keep shared data updated in real time where users from around the world submit data, use AppSync with DynamoDB
+To keep shared data updated in real time where users from around the world submit data, use AppSync with DynamoDB.
+
+DynamoDB autoscaling can be used directly to dynamically adjust provisioned throughput capacity in response to traffic patterns.
 
 ---
 
@@ -229,7 +239,6 @@ DynamoDB Stream allows the invocation of other services if items are created/upd
 
 By default, tables are encrypted with KMS. You can use a customer-managed key (CMK).
 
-
 ### X.Y. Aurora
 
 Relational db, supports dynamic storage scaling and can conduct table joins. Automatically scales to accomodate data growth.
@@ -253,11 +262,13 @@ In a Multi-AZ db if the primary db fails, the canonical name record (CNAME) swit
 
 RDS has storage autoscaling to scale storage capacity with zero downtime.
 
-* ElastiCache: caches database query results
+ElastiCache: caches database query results
+
+Cloudwatch has the following enhanced monitoring metrics fr RDS: RDS child processes and OS processes
 
 ### X.Y. EBS
 
-They can only be attached to instances in the same AZ.
+They can only be attached to instances in the same AZ. Don't allow concurrent connections from multiple instances
 
 | Features | SSD | HDD |
 |-|-|-|
@@ -266,10 +277,11 @@ They can only be attached to instances in the same AZ.
 | Suitable use cases | Transactional workloads, sustained IOPS performance, large db workloads | large streaming workloads, big data, data warehouses, throughput-oriented storage for large volumes of data that's infrequently accessed |
 | Cost | Moderate/high | Low |
 
-* General purpose
-* Provisioned IOPS: I/O intensive
-* Throughput optimized: large operations (large data)
+* General purpose: SSD-backed
+* Provisioned IOPS: I/O intensive, low-latency. best for NoSQL or large RDBS. Require lots of storage
+* Throughput optimized: large operations (large data), also magnetic
 * For infrequently accessed data, always cold HDD
+	- Magnetic volume: lowest cost per GB
 
 To back up all EBS volumes, use Amazon Data lifecycle manager (DLM) to automate the creation of snapshots.
 
@@ -323,7 +335,7 @@ MySQL and PostgreSQL dbs instance can be authenticated with IAM DB authenticatio
 
 ### Monitoring
 
-* CloudTrail: check who made changes to AWS resources
+* CloudTrail: check who made changes to AWS resources, stores rules in S3
 * AWS Config: assesses, audits and evaluates resources. Can automate the evaluation of recorded configs against desired configs. By creating an AWS Config rule, you can enforce your ideal configuration in your AWS account
 	- CloudTrail can track changes, can't enforce rules to comply with your policies
 
@@ -357,9 +369,21 @@ Inbound rules for EC2 instances are evaluated starting the lowest numbered rule:
 
 * If rule #100 says allow and rule #* says deny, #100 is evaluated first -> allow. if source is allowed on rule #100, it won't further evaluate rule #101 etc.
 
+If an EC2 inside a VPC doesn't have an associated DNS hostname, first enable the DNS resolution and DNS hostname on the VPC configuration
+
+* Peering connection: allows connection just within the VPCs, not with the connections that the other VPC has.
+* Transit gateway: connect VPCs and on-prem networks, centrally manage point-to-point connectivity. You only create and manage 1 connection from the central gateway to each VPC/on-prem, and transit gateway acts like a hub that controls traffic
+	- Without transit gateway, you'd need peering connection between all VPCs + attaching a VPN to each individual VPC
+
+![image.png](https://media.tutorialsdojo.com/transit-gateway-Inter-Region-Peering.jpg)
+
+---
+
+An Elastic Fabric Adapter (EFA) is a network device that you can attach to an EC2 instance to accelerate HPC apps.
+
 ### VPN
 
-A VPN allows you will be able to connect your Amazon VPC to other remote networks securely using private sessions with IP security (IPSec) or transport layer security (TLS) tunnels.
+A VPN allows you to connect your Amazon VPC to other remote networks securely using private sessions with IP security (IPSec) or transport layer security (TLS) tunnels.
 
 AWS Site-to-Site VPN: to connect on-prem and AWS, cheap option with limited bandwidth and limited traffic.
 
@@ -369,7 +393,7 @@ To connect from on-prem to VPCs with a VPN, the customer side needs a Customer G
 
 * Security group: firewall for EC2 instances
 	- Supports allow rules only
-* NACL (network access control list): firefall for associated subnets
+* NACL (network access control list): firewall for associated subnets, for the whole subnet
 	- Supports allow + deny rules
 
 ### Route 53
@@ -426,10 +450,6 @@ To route traffic to an ELB load balancer, use Route 53, create an alias record t
 
 To allow only clients connecting from the IP addres XXX should have access to the host, set the security group inbound rule, protocol tcp, range-22, source XXX/32. /32 is to specify one IP address, /0 refers to the entire network.
 
-> 2 VPCs with peering connections with each other
-
-Peering connection is just within the VPCs, not with the connections that the other VPC has.
-
 > Windows Bastion
 
 A bastion host is a special purpose computer on a network specifically designed and configured to withstand attacks, it's equivalent to an EC2 instance. It should be in a public subnet with either a public or Elastic IP address with sufficient RDP or SSH access defined in the security group. Users log on to the bastion host via SSH or RDP and then use that session to manage other hosts in the private subnets.
@@ -443,6 +463,8 @@ Static IPv4 (can only connecto to NLB) address masks the failure of an instance 
 Can be used to use the trusted IPs as Elastic IP addresses (EIP) to the NLB.
 
 ### Load balancers
+
+Must be deployed on a public subnet.
 
 * Network load balancer: 4th layer of the OSI model
 * Application load balancer: supports path-based routing, host-based routing, bi-directional communication with WebSockets
@@ -502,6 +524,9 @@ DLQ: dead letter queues: if a message is considered unprocessable, it's sent to 
 
 Max in-flight msgs 120k, for FIFO 20k.
 
+> Amazon SWF
+
+Ensures a task is never duplicated and is assigned only once. A specific task is given to only one worker. These facilities enable you to coordinate your workflow without worrying about duplicate, lost, or conflicting tasks.
 
 ### MQ
 
@@ -527,8 +552,7 @@ Amazon API Gateway provides throttling at multiple levels including global and b
 
 API Gateway can scale using AWS Edge locations, but for bursts of API, you need to configure throttling limits. Any request over the limit will receive a 429 HTTP response.
 
-
-
+X-Ray: traces and analyzes **user requests** as they travel through the API Gateway
 
 ---
 
