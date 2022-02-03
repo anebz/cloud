@@ -12,15 +12,13 @@
 - [AWS Certified solutions associate](#aws-certified-solutions-associate)
 	- [1. Compute](#1-compute)
 		- [1.1. EC2](#11-ec2)
-			- [Autoscaling](#autoscaling)
+			- [1.1.1. Autoscaling](#111-autoscaling)
 		- [1.2. ECS](#12-ecs)
 		- [1.3. Lambda](#13-lambda)
-		- [1.4. Fargate](#14-fargate)
-		- [1.5. Beanstalk](#15-beanstalk)
 	- [2. Storage](#2-storage)
 		- [2.1. S3](#21-s3)
-			- [S3 notification feature](#s3-notification-feature)
 		- [2.2. EBS](#22-ebs)
+		- [2.3. File storage](#23-file-storage)
 		- [2.3. RDS](#23-rds)
 		- [2.4. Aurora](#24-aurora)
 		- [2.5. DynamoDB](#25-dynamodb)
@@ -92,7 +90,7 @@ If you purchased a reserved instance but you want to stop it, terminate the RI a
   	- NACL are stateless
   	- if you only enabled an Inbound rule in NACL, the traffic can only go in but the SSH response will not go out since there is no Outbound rule.
 
-#### Autoscaling
+#### 1.1.1. Autoscaling
 
 A service that increases and decreases the number of instances based on certain metrics: CPU usage, memory usage etc. To create an autoscaling group, create a launch configuration and set an AMI. When downscaling, it deletes the ones with the oldest launch config, from the AZ with the most #instances, and the ones closest to the next billing hour.
 
@@ -124,91 +122,67 @@ Which services run the containers?
 * EC2 instances (which have the ECS container agent running)
 * Fargate launch type (serverless). Has less capacity than EC2
 
-ECS tasks can be run on CloudWatch events, e.g. when a file is uploaded to a certain S3 bucket using a S3 PUT operation. You can also declare a reduced number of ECS tasks whenever a file is deleted on the S3 bucket using the DELETE operation.
+ECS can handle bursts in traffic but it takes minutes to set up new containers.
 
-First, create an Event **rule** for S3 that watches for object-level operations (PUT, DELETE). For object-level operations, it is required to create a CloudTrail trail first. On the Targets section, select the "ECS task" and input the needed values such as the cluster name, task definition and the task count. You need two rules – one for the scale-up and another for the scale-down of the ECS task count.
+ECS tasks can be run on CloudWatch events, e.g. when a file is uploaded to a certain S3 bucket using a S3 PUT operation. You can also declare a reduced number of ECS tasks whenever a file is deleted on the S3 bucket using the DELETE operation. First, create an Event **rule** for S3 that watches for object-level operations (PUT, DELETE). For object-level operations, it is required to create a CloudTrail trail first. On the Targets section, select the "ECS task" and input the needed values such as the cluster name, task definition and the task count. You need two rules – one for the scale-up and another for the scale-down of the ECS task count.
 
-To insert sensitive data into containers, you can store it in Secrets Manager secrests or SYstem Manager Parameter Store parameters. Then you can reference them in the container definition. This feature is supported by tasks using both the EC2 and Fargate launch types.
+To insert sensitive data into containers, you can store it in Secrets Manager secrests or System Manager Parameter Store parameters. Then you can reference them in the container definition. This feature is supported by tasks using both the EC2 and Fargate launch types.
 
 * Use the `secrets` container definition parameter to inject sensitive data as environment variables
 * Use the `secretOptions` container definition parameter to inject sensitive data in the log configuration of a container
 
-They can also handle bursts in traffic but it takes minutes to set up new containers.
-
 ### 1.3. Lambda
+
+Event driven, serverless compute service. Thought for fast operations that take less than 15mins. They can be used to handle bursts of traffic in seconds.
 
 You can use aliases when updating functions, to have the Lambdas versioned. This enables canary deployment (e.g. only sending 20% to the updated function)
 
-They can be used to handle bursts of traffic in seconds in serverless applications.
-
-For sensitive info in env variables, create a new KMS key and use it to enable encryption helpers that leverage on KMS to store and encrypt the sensitive info. Lambda encrypts the environment variables in the function by default, but the info is still visible to other users who have access to the Lambda console. Lambda uses a default KMS key to encrypt the variables, which is usually accessible by other users.
+For sensitive info in env variables, create a *new* KMS key and use it to enable encryption helpers that leverage on KMS to store and encrypt the sensitive info. Lambda encrypts the environment variables in the function by default, but the info is still visible to other users who have access to the Lambda console. Lambda uses a default KMS key to encrypt the variables, which is usually accessible by other users.
 
 * Provisioned concurrency: keep instances provisioned, more expensive
 * Reserved concurrency: dedicated reservations of parallel execution for your function.  This number will be subtracted from your default account soft limit of 1000 parallel executions
 	- Guarantees that this concurrency level is always possible for your function
 	- But concurency can't be exceeded
 	
-Lambda@Edge: allows you to execute code at different times when the CloudFront distribution is called
+Lambda@Edge: allows you to execute code at different times when the CloudFront distribution is called, processing done closer to the edge.
 
 Step functions: serverless orchestration, coordinates AWS services into serverless workflows.
 
-### 1.4. Fargate
+---
 
-Useful for microservices and launching containers in a serverless way, also helps with container cluster management. For ECS & Fargate, specify CPU and memory at the task definition.
+Other compute services:
 
-### 1.5. Beanstalk
-
-PaaS service for webapps. Supports deployment from Docker containers. Capacity provisioning, load balancing, scaling and health monitoring are automatically handled.
+* Fargate: useful for microservices and launching containers in a serverless way, also helps with container cluster management. For ECS & Fargate, specify CPU and memory at the task definition.
+* Beanstalk: PaaS service for webapps. Supports deployment from Docker containers. Capacity provisioning, load balancing, scaling and health monitoring are automatically handled.
 
 ## 2. Storage
 
-![image.png](http://media.tutorialsdojo.com/aws-storage-services.png)
+> Hybrid storage, AWS Storage Gateway
 
-* Amazon FSx For Lustre: high-performing *parallel* file system for fast processing of workloads, useful for HPC. It has POSIX interface
-* Amazon FSx For Windows File Server: fully managed Microsoft Windows filesystem with support for SMB protocol, Windows NFTS, Microsoft Active Directory integrations. Useful for app workloads that require shared file storage.
-* AWS Storage gateway: integrate the on-premises network to AWS but doesn't migrate apps, used for hybrid cloud storage. If using a fileshare in Storage Gateway, the on-premises systems are still kept. Enables Active Directory users to deploy storage on their workstations as a drive. mounted as a disk for on-premises desktop computers. To access the data moved to S3, use File Gateway, not S3 API.
-	- File Gateway: supports a file interface into S3, and you get a virtual software appliance on-prem. Supports protocols NFS and SBM
-	- Volume Gateway: cloud-backed storage volumes that you can mount as iSCSI devices from on-prem servers.
-		+ Cached volumes: store data in S3, copy of frequently accessed subsets on-prem
-		+ Stored volumes: store data on-prem, asynchronously backup snapshots to S3
-	- Tape Gateway: archive backup to Glacier
-* EFS: only supports Linux workloads, allow concurrent connections from multiple instances hosted on multiple AZs.
-* Neptune: graph database
+Integrate the on-premises network to AWS, used for hybrid cloud storage, on-premises systems are kept. Enables Active Directory users to deploy storage on their workstations as a drive.
 
----
+* File Gateway: supports a file interface into S3, and you get a virtual software appliance on-prem. Supports protocols NFS and SMB. Don't use S3 API to access data moved to S3
+* Volume Gateway: cloud-backed storage volumes that you can mount as iSCSI devices from on-prem servers.
+  - Cached volumes: store data in S3, copy of frequently accessed subsets on-prem
+  - Stored volumes: store data on-prem, asynchronously backup snapshots to S3
+* Tape Gateway: archive backup to Glacier
 
-Migration:
+> Data migration
 
-* AWS Snowball edge: type of Snowball device with on-board storage and compute power. Each Snowball Edge device can transport data at speeds faster than the internet. The AWS Snowball Edge device differs from the standard Snowball because it can bring the power of the AWS Cloud to your on-premises location, with local storage and compute functionality. Can't directly integrate backups to S3 Glacier, only to S3.
-* AWS Snowmobile exabyte-scale data transfer service. Up to 100PB per Snowmobile
 * AWS DataSync: upload all data to AWS, 100% cloud architecture. nothing stored on-prem. Used for replication of data to and from AWS storage services
-
----
-
-To migrate databases to AWS, use Schema Conversion tool to convert the source schema and application code to match that of the target databse, and then use DB migration service to migrate data from the source db to target db.
+* AWS Snowball edge: type of Snowball device with on-board storage and compute power. Each Snowball Edge device can transport data at speeds faster than the internet. Can't directly integrate backups to S3 Glacier, only to S3.
+* AWS Snowmobile: exabyte-scale data transfer service. Up to 100PB per Snowmobile
 
 ### 2.1. S3
 
-Supports up to 3500 PUT and 5500 GET requests per second
+Object type storage service. Supports up to 3500 PUT and 5500 GET requests per second.
 
-* Amazon Athena: analyze data directly in S3 using standard SQL. Can work on many objects
-* S3 select: retrieve only a subset of the object by using simple SQL expressions
-
-CORS (cross-origin resource sharing) allows webapps loaded in one domain to interact with resources in a different domain. For instance, to add JavaScript to the webapp.
-
-Cross-region replication needs to have versioning enabled first.
-
-To make all objects public to the Internet, configure the bucket policy to set all objects to pubic read. Grant public access to the object when uploading it using the console.
-
-Use pre-signed URLs to access specific objects.
-To control traffic to trusted buckets (expecting there to be a lot of buckets), set an endpoint policy. You can also create bucket policies but it takes a lot of time.
-
-S3 object lock allows you to store objects using a write-once-read-many (WORM) model. Changes to objects are allowed but their previous versions should be preserved and remain retrievable. If you enabled S3 Object Lock, you won't be able to upload new versions of an object. This feature is only helpful when you want to prevent objects from being deleted or overwritten for a fixed amount of time or indefinitely.
+> Storage types
 
 * S3 standard: no minimum storage duration charge
 * S3 Standard - Infrequent Access: is used for infrequently-accessed data, but rapid access. Not for backup. data should be in this mode for at least 30 days.
 * Standard IA and One Zone-IA: for infrequent access, the lifecycle policy can only transition data to this storage type *after 30 days of creation*. min data storage duration: 30 days
-* S3 Glacier (+ deep archive) for archiving
+* S3 Glacier (+ deep archive) *for archiving*
 	- Expedited retrieval: allows you to quickly access data if you have an urgent request. Provisioned capacity ensures that retrieval capacity for expedited retrievals is available when you need it.
 	- Glacier supports vault lock policy, which helps enforce regulatory and compliance requirements
 	- Glacier: min data duration: 90 days
@@ -216,25 +190,45 @@ S3 object lock allows you to store objects using a write-once-read-many (WORM) m
 
 With lifefycle policy, you can specify that the data is moved to another storage class (like for archiving).
 
+> Access
+
+* All objects public to the Internet: configure the bucket policy to set all objects to pubic read. Grant public access to the object when uploading it using the console
+* Access only to specific objects: pre-signed URLs
+* Grant access to trusted buckets: set and endpoint policy. Bucket policy also works but it takes a lot of time.
+
+> Extract data
+
+* Amazon Athena: analyze data directly in S3 using standard SQL. Can work on many objects
+* S3 select: retrieve only a subset of the object by using simple SQL expressions
+
+> Other info
+
+* CORS (cross-origin resource sharing) allows webapps loaded in one domain to interact with resources in a different domain. For instance, to add JavaScript to the webapp
+* Cross-region replication needs to have versioning enabled first
+* S3 object lock allows you to store objects using a write-once-read-many (WORM) model. Changes to objects are allowed but their previous versions should be preserved and remain retrievable. If you enabled S3 Object Lock, you won't be able to upload new versions of an object. This feature is only helpful when you want to prevent objects from being deleted or overwritten for a fixed amount of time or indefinitely
+* Server access logs for S3 buckets provide detailed records for the requests that are made to an S3 bucket, e.g. requester, bucket name, request time, request action, referrer etc.
+
 > Retention modes
 
-* 𝗚𝗼𝘃𝗲𝗿𝗻𝗮𝗻𝗰𝗲 - overwrites/deletes are only possible with specific rights
-* 𝗖𝗼𝗺𝗽𝗹𝗶𝗮𝗻𝗰𝗲 - no deletes or overwrites possible for the duration of the retention period
+* Governance - overwrites/deletes are only possible with specific rights
+* Compliance - no deletes or overwrites possible for the duration of the retention period
 
-To securely serve private content via CloudFront:
+> Securely serve private content via CloudFront
 
 * Require that users access the private content by using special CloudFront signed URLs or signed cookies
-* Requre that users access S3 content via cloudfront urls, not s3 urls. set up an origin access identity (OIA) for the bucket and give it permission to read files in the bucket
+* Requre that users access S3 content via CloudFront urls, not s3 urls. set up an origin access identity (OIA) for the bucket and give it permission to read files in the bucket
 
-Server access logs for S3 buckets provide detailed records for the requests that are made to an S3 bucket, e.g. requester, bucket name, request time, request action, referrer etc.
+> S3 notification feature
 
-#### S3 notification feature
-
-The S3 notification feature can send notifications when certain events happen in a bucket. S3 event notifications are designed to be delivered at least once and to one destination only. You cannot attach two or more SNS topics or SQS queues for S3 event notification. Therefore, you must send the event notification to Amazon SNS. SQS and Lambda are also correct destinations.
+It can send notifications when events happen in a bucket. S3 event notifications are designed to be delivered at least once and to one destination only, e.g. SNS, SQS or Lambda but only one. You cannot attach two or more SNS topics or SQS queues for S3 event notification. If you need 2 SQS queues, set up a SNS queue and fan out to several SQSs.
 
 ### 2.2. EBS
 
-They can only be attached to instances in the same AZ. Don't allow concurrent connections from multiple instances
+* They can only be attached to instances in the same AZ. Don't allow concurrent connections from multiple instances
+* EBS volumes spport live config changes in production, you can change volume type, size and IOPS capacity without service interruptions
+* EBS volumes are off-instance, they can persist independently from the life of an instance. To prevent EBS from being deleted when an instance terminates, set the value of DeleteOnTermination to False
+
+> Types
 
 | Features | SSD | HDD |
 |-|-|-|
@@ -246,34 +240,29 @@ They can only be attached to instances in the same AZ. Don't allow concurrent co
 * General purpose: SSD-backed, used as boot volume
 * Provisioned IOPS: I/O intensive, low-latency. best for NoSQL or large RDBS. Require lots of storage
 * Throughput optimized: large operations (large data), also magnetic
-* For infrequently accessed data, always cold HDD
-	- Magnetic volume: lowest cost per GB
-
-EBS volumes spport live config changes in production, you can change volume type, size and IOPS capacity without service interruptions.
-
-EBS volumes are off-instance, they can persist independently from the life of an instance. To prevent EBS from being deleted when an instance terminates, set the value of DeleteOnTermination to False.
+* For infrequently accessed data, always cold HDD. Magnetic volume has lowest cost per GB
 
 > Snapshots
 
-To back up all EBS volumes, use Amazon Data lifecycle manager (DLM) to automate the creation of snapshots.
+* To back up all EBS volumes, use Amazon Data lifecycle manager (DLM) to automate the creation of snapshots
+* The EBS can still be used while the snapshot is being created
+* Snapshots are automatically encrypted, and all data moving between the volume and the instance are encrypted
+* To ensure that restored volumes from unencrypted snapshots are automatically encrypted, enable EBS Encryption by default feature for the *Region*
 
-The EBS can still be used while the snapshot is being created. Snapshots are automatically encrypted, and all data moving between the volume and the instance are encrypted.
+### 2.3. File storage
 
-To ensure that restored volumes from unencrypted snapshots are automatically encrypted, enable EBS Encryption by default feature for the Region.
+* Amazon FSx For Lustre: high-performing *parallel* file system for fast processing of workloads, useful for HPC. It has POSIX interface
+* Amazon FSx For Windows File Server: fully managed Microsoft Windows filesystem with support for SMB protocol, Windows NFTS, Microsoft Active Directory integrations. Useful for app workloads that require shared file storage
+* EFS: only supports Linux workloads, allow concurrent connections from multiple instances hosted on multiple AZs
 
 ### 2.3. RDS
 
-If an instance of RDS in 1 AZ fails very often, enable Multi-AZ deployment, which has synchronous replication. Making a snapshot allows a backup, but it doesn't provide immediate availability in case of AZ failure.
+Relational databaser service. Provides storage autoscaling to scale storage capacity with 0 downtime. Supports Multi-AZ RDS db, for higher availability in case of AZ failure. This has synchronous replication to the secondary db. If the primary db were to fail, the canonical name record (CNAME) switches from the primary to standby instance.
 
-In a Multi-AZ db if the primary db fails, the canonical name record (CNAME) switches from the primary to standby instance.
-
-RDS has storage autoscaling to scale storage capacity with zero downtime.
-
-ElastiCache: caches database query results, caches data storage for user sessions
-
-Cloudwatch has the following enhanced monitoring metrics fr RDS: RDS child processes and OS processes.
-
-To encrypt network traffic from and to the RDS db with SSL, set up an RDS db and enable the IAM DB authentication. IAM database authentication works with MySQL and PostgreSQL. With this authentication method, you don't need to use a password when you connect to a DB instance. Instead, you use an authentication token.
+* To migrate databases to AWS, use Schema Conversion tool to convert the source schema and application code to match that of the target databse, and then use DB migration service to migrate data from the source db to target db
+* ElastiCache caches database query results for faster retrieval, caches data storage for user sessions
+* Cloudwatch has the following enhanced monitoring metrics for RDS: RDS child processes and OS processes
+* To encrypt network traffic from and to the RDS db with SSL, enable the IAM DB authentication. IAM database authentication works with MySQL and PostgreSQL. With this authentication method, you don't need to use a password when you connect to a DB instance. Instead, you use an authentication token.
 
 ### 2.4. Aurora
 
