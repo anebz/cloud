@@ -29,19 +29,12 @@
 		- [3.3. Load balancers](#33-load-balancers)
 		- [3.4. Route 53](#34-route-53)
 		- [3.5. VPC](#35-vpc)
-		- [3.6. VPN](#36-vpn)
-		- [3.7. Subnets](#37-subnets)
 	- [4. Security](#4-security)
 		- [4.1. IAM](#41-iam)
-		- [4.2. Encryption](#42-encryption)
-		- [4.3. AWS Secrets manager](#43-aws-secrets-manager)
 	- [5. Management](#5-management)
 		- [5.1. CloudWatch](#51-cloudwatch)
+		- [5.2. CloudTrail](#52-cloudtrail)
 	- [6. Analyics](#6-analyics)
-		- [6.1. Kinesis](#61-kinesis)
-		- [6.2. EMR](#62-emr)
-		- [6.3. Glue](#63-glue)
-		- [6.7. Redshift](#67-redshift)
 	- [7. Messaging](#7-messaging)
 		- [7.1. SQS](#71-sqs)
 		- [7.2. SNS](#72-sns)
@@ -73,7 +66,7 @@ To monitor custom metrics, you must install the CloudWatch agent on the instance
 
 > Instance types
 
-* Standard reserved instance: more discount, can't exchange instances but can change Availability Zone, scope, network platform, or instance size
+* Standard reserved instance: more discount, can't exchange instances but can change AZ, scope, network platform, or instance size
 * Convertible reserved instance: flexibility to change families, OS types and tenancies
 Scheduled reserved instance: purchase capacity reservations that recur on a daily/weekly/monthly basis with a specified start time and duration, for a one-year term
 
@@ -88,7 +81,8 @@ If you purchased a reserved instance but you want to stop it, terminate the RI a
   	- Security groups are stateful: if inbound traffic is granted, outgoing traffic is automatically granted as well
   * On the NACL (access to whole subnet), add inbound + outbound rule to allow SSH to instance
   	- NACL are stateless
-  	- if you only enabled an Inbound rule in NACL, the traffic can only go in but the SSH response will not go out since there is no Outbound rule.
+  	- if you only enabled an Inbound rule in NACL, the traffic can only go in but the SSH response will not go out since there is no Outbound rule
+* To accelerate HPC apps, add an Elastic Fabric Adapter (EFA), which is a network device 
 
 #### 1.1.1. Autoscaling
 
@@ -200,6 +194,7 @@ With lifefycle policy, you can specify that the data is moved to another storage
 
 * Amazon Athena: analyze data directly in S3 using standard SQL. Can work on many objects
 * S3 select: retrieve only a subset of the object by using simple SQL expressions
+* Amazon Macie: ML-powered service that monitors and detects usage patterns on S3 data, detect anomalies, risk of unauthorized access or inadvertent data leaks. It can recognize PII (personally identifiable info)
 
 > Other info
 
@@ -266,69 +261,63 @@ Relational databaser service. Provides storage autoscaling to scale storage capa
 
 ### 2.4. Aurora
 
-Relational db, supports dynamic storage scaling and can conduct table joins. Automatically scales to accomodate data growth.
+Relational db, supports dynamic storage scaling and can conduct table joins. Automatically scales to accomodate data growth. Can have more throughput than MySQL and PostgreSQL.
 
-For certain Aurora tasks, different instances perform different roles. The primare instance handles all data definition language (DDL) and data manipulation language (DML) statements. Up to 15 Aurora Replicas handle read-only query traffic. Using endpoints, you can ap each connection to the appropriate instance based on your use case. The custom endpoint provides load-balanced database connections based on criteria other than the read-only or read-write capability of the DB instances.
+An Aurora DB cluster consists of one or more DB instances and a cluster volume that manages the data for those DB instances. Each Aurora DB cluster can have up to 15 Aurora Replicas in addition to the primary DB instance. 
 
-An Aurora serverless DB cluster is a DB cluster that automatically starts up, shuts down and scales up/down based on the app's needs. It's a simple, cost-effective option for infrequent, intermittent sporadic or unpredictable workloads. You can create a db endpoint without specifying the DB instance class size, you only set the min and max capacity. The endpoint connects to a proxy fleet that routes the workload to a fleet of resources that are automatically scaled.
+Aurora serverless DB cluster: DB cluster that automatically starts up, shuts down and scales up/down based on the app's needs. It's a simple, cost-effective option for infrequent, intermittent sporadic or unpredictable workloads. You can create a db endpoint without specifying the DB instance class size, you only set the min and max capacity. The endpoint connects to a proxy fleet that routes the workload to a fleet of resources that are automatically scaled.
 
-Non serverless clusters use the *provisioned* db engine mode.
+A non-Serverless DB cluster for Aurora is called a provisioned DB cluster.
 
-Aurora Global db is designed for globally distributed apps. It supports storage-based replication (RPO) with a latency of <1s. If there's an unplanned outage, one of the secondary regions you assigned can be promoted to read and write capabilities (RPO) in <1min.
+Aurora Global db is designed for globally distributed apps, it spans multiple regions. It supports storage-based replication (RPO) with a latency of <1s. If there's an unplanned outage, one of the secondary regions you assigned can be promoted to read and write capabilities (RPO) in <1min. Consists of one primary AWS Region where your data is mastered, and one read-only, secondary AWS Region.
 
-* Reader endpoint: load-balances each connection request among the Aurora replicas
+* Reader endpoint: load-balances each connection request among the Aurora replicas, read-only connections
 * Cluster/writer endpoint: connects to the primary db instance, used for write operations
 
 ### 2.5. DynamoDB
 
-DynamoDB is a multi-AZ, NoSQL db (suitable for key-value stores) that can handle frequent schema changes and doesn't have downtime with schema changes.
+DynamoDB is a multi-AZ, NoSQL db (suitable for key-value stores) that can handle frequent schema changes and doesn't have downtime with schema changes
+
+* DynamoDB + AppSync: to keep shared data updated in real time where users from around the world submit data
+* DynamoDB + ElastiCache: provide high performance storage of key-value pairs
+* DynamoDB autoscaling: can be used directly to dynamically adjust provisioned throughput capacity in response to traffic patterns
+* Global tables: synchronized tables in different regions
+* CloudWatch by default captures: user read capacity units, user write capacity units, throttles
+* By default, tables are encrypted with KMS. You can use a customer-managed key (CMK)
+* DynamoDB Stream: invoke of other services if items are created/updated/deleted. A stream record contains info about data modifications. You can configure the stream so that the record captures additional info, e.g. the before/after images of modified items. You can set up triggers so that a specific change in a table triggers a Lambda function.
+
+> Capacity
 
 * Provisioned capacity: specify the capacity units for the table and get billed for them. Useful foor steady load or known patterns
-* On-demand: paying per request (good for unpredictable traffic). Pricing is pay-per-request for read and write requests.
+* On-demand: paying per request (good for unpredictable traffic). Pricing is pay-per-request for read and write requests
+
+> Partitions
 
 A document in DynamoDB doesn't have a fixed schema. Each table defines the primary key, the unique identifier for each table and it must be provided when inserting a new item:
 
 * Simple (single field): also the partition key
 * Composite: build-up via the partition and range key. Range key can be used with expressions
 
+![keys.png](https://img-c.udemycdn.com/redactor/raw/2018-10-23_05-24-29-74b3e6dadc8ce683ccd2a5bd00f99889.png)
+
 Internally, DynamoDB has different partitions where the items are stored. The partition key runs through a hash function whose result determines the partition. A good partition should be equally distributed. This is important because the read/write capacity units are distributed among partitions. If items aren't well distributed, your requests are more likely of being throttled because you'll have hot partitions /partitions receiving high load).
 
 To distribute db workload evenly and using provisioned throughput efficiently, use partition keys with high-cardinality attributes, which have a large number of distinct values for each item.
-
-* Query: looks for items at a specific partition. You're billed only for the retrieved items. Query works on indexes (partition & range key, if any). Cheaper and faster than a scan.
-* Scan: runs through the table looking for items that match your expression. You're billed by the items that are scanned
-
-To keep shared data updated in real time where users from around the world submit data, use AppSync with DynamoDB.
-
-DynamoDB autoscaling can be used directly to dynamically adjust provisioned throughput capacity in response to traffic patterns.
-
----
 
 Secondary indexes:
 
 * Local (local secondary index - LSI): needs to have the same hash/partition key, but an alternative range key. max 5 per table
 * Global (GSI): partition & range key can be different. max 20 per table
 
----
+> Search
 
-Backups:
+* Query: looks for items at a specific partition. You're billed only for the retrieved items. Query works on indexes (partition & range key, if any). Cheaper and faster than a scan
+* Scan: runs through the table looking for items that match your expression. You're billed by the items that are scanned
+
+> Backups:
 
 * On-demand: regularly trigger on-demand backups. A lambda function that triggers backups via aws-sdk. EventBridge rule that invokes the function regularly
 * Continuous backups via point-in-time-recovery: more costly, allows you to restore the table to any state within the last 35 days.
-
-With global tables, you can have synchronized tables in different regions.
-
-CloudWatch by default captures: user read capacity units, user write capacity units, throttles
-
-DynamoDB and ElastiCache provide high performance storage of key-value pairs.
-
-DynamoDB Stream allows the invocation of other services if items are created/updated/deleted. A stream record contains info about data modifications. You can configure the stream so that the record captures additioanl info, e.g. the before/after images of modified items. You can set up triggers so that a specific change in a table triggers a Lambda function.
-
-![image.png](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/images/StreamsAndTriggers.png)
-
-![keys.png](https://img-c.udemycdn.com/redactor/raw/2018-10-23_05-24-29-74b3e6dadc8ce683ccd2a5bd00f99889.png)
-
-By default, tables are encrypted with KMS. You can use a customer-managed key (CMK)
 
 ### 2.6. Redis
 
@@ -340,26 +329,21 @@ If users need to authenticate, use Redis AUTH by creating a new Redis Cluster wi
 
 Low-latency and high-transfer speed content delivery network
 
-To block access for certain coutries, use CloudFront geo restriction.
+* Geo restriction: block access for certain countries
+* Cache: CloudFront serves an object from an edge location until the cache duration passes, then next time the edge location gets a user request for the object, CloudFront forwards the request to the origin server to verify that cache == latest version. The Cache-Control max-age directive lets you specify how long (in seconds) you want an object to remain in the cache before CloudFront gets the object again from the origin server
+* If users around the world have HTTP 504 errors, set up an origin failover by creating an origin group with 2 origins: specify one as the primary origin, the other as secondary origin which CloudFront automatically switches to when the primary origin returns specific HTTP status code failure updates. You can also deploy the app to multiple AWS regions and set up a Route53 record with latency routing policy to route incoming traffic to the region that provides the best latency, but this has more costs
 
-To reduce delay around the world, use Lambda@Edge which allows Lambda functions to execute the authentication process in AWS locations closer ot the users. Only works for serverless architectures.
+---
 
-If users around the world have HTTP 504 errors, set up an origin failover by creating an origin group with 2 origins: specify one as the primary origin, the other as secondary origin which CloudFront automatically switches to when the primary origin returns specific HTTP status code failure updates.
-
-CloudFront serves an object from an edge location until the cache duration passes, then next time the edge location gets a user request for the object, CloudFront forwards the request to the origin server to verify that cache == latest version. The Cache-Control max-age directive lets you specify how long (in seconds) you want an object to remain in the cache before CloudFront gets the object again from the origin server.
-
-You can also deploy the app to multiple AWS regions and set up a Route53 record with latency routing policy to route incoming traffic to the region that provides the best latency, but this has more costs.
-
-* Lambda@Edge: run general-purpose code on regional edge locations. Executed in one of AWS' 13 regional edge caches. Supports JS/Python, 5s (viewer), 30s (origin triggers), max memory is 128MB (viewer) & 10GB (origin), has network access. Used in scenarios:
+* Lambda@Edge: run general-purpose code on regional edge locations, reduces delay of processing. Only for serverless architectures. Executed in one of AWS' 13 regional edge caches. Supports JS/Python, 5s (viewer), 30s (origin triggers), max memory is 128MB (viewer) & 10GB (origin), has network access. Used in scenarios:
 	- Viewer request/response: invoked at the start/end of all requests
 	- Origin request/response: only when cloudfront requests the origin/retrieves a response
 * Cloudfront functions: lightweight version of Lambda@Edge, less capabilities but better latency and cheaper. Executed in one of 218 edge locations. Used for access control & authorization, HTTP redirects, cache manipulation.
 	- Supports JS, max exec time is 1ms, max memory is 2MB, has no network access.
 
-
 ### 3.2. API Gateway
 
-Enables you to build RESTful APIs and WebSocket APIs optimized for serverless workloads. You pay only for the API calls you receive and the amount of data transferred out.
+Service to build RESTful APIs and WebSocket APIs optimized for serverless workloads. Billing is only for the API calls you receive and the amount of data transferred out.
 
 API Gateway has three major parts:
 
@@ -375,108 +359,46 @@ Amazon API Gateway provides throttling at multiple levels including global and b
 
 API Gateway can scale using AWS Edge locations, but for bursts of API, you need to configure throttling limits. Any request over the limit will receive a 429 HTTP response.
 
-X-Ray: traces and analyzes **user requests** as they travel through the API Gateway and other microservices, not EC2 instances.
-
+**X-Ray**: traces and analyzes **user requests** as they travel through the API Gateway and other microservices, not EC2 instances.
 
 ### 3.3. Load balancers
 
-Load balancers distribute traffic within their respective region. For cross-region, choose Route 53. Must be deployed on a public subnet. Load balancers can have access logs enabled to see info about the HTTP requests going through it.
+Load balancers distribute traffic within their respective region. For cross-region, choose Route 53.
 
-Load balancers can route requests based on the host field, path url, HTTP header, HTTP method etc. Path-based routing allows you to route a request based on the URL path of the HTTP header.
+* Must be deployed on a public subnet
+* Load balancers can have access logs enabled to see info about the HTTP requests going through it
+* Load balancers can route requests based on the host field, path url, HTTP header, HTTP method etc. Path-based routing allows you to route a request based on the URL path of the HTTP header
+* Cross-zone load balancing allows load balancing across multiple AZs
 
-Cross-zone load balancing allows load balancing across multiple AZs.
+Load balancer types:
 
 * Network load balancer: 4th layer of the OSI model
 * Application load balancer: supports path-based routing, host-based routing, bi-directional communication with WebSockets. Also supports weighted target groups routing
+  * An ALB sends requests to healthy instances only. It performs periodic health checks on targets in a target group, if an instance fails the health check a configurable amount of times it'll be marked as unhealthy and won't receive traffic until it passes another health check
 
 ### 3.4. Route 53
 
-DNS web service, it redirects traffic via domain names to your apps. (DNS == resolving domains into their IP addresses.) 3 main functions:
+DNS web service, it redirects traffic via domain names to your apps. DNS resolves domains into their IP addresses
 
-* Domain registration
-* DNS routing (from example.com to the IP address, from an email account to the email server, from a subdomain to the IP address)
-	- Simple routing: used for single resources that are performing given functions in your domain. Can't create multiple records with the same name for this type
-	- Weighted routing: you can define multiple records for the same (sub-)domain name and let you choose how much traffic is routed to each one of them. Useful for load balancing
-	- Geolocation routing: route traffic based on the grographic location of users
-	- Geoproximity routing: routes traffic based on the geographic location of the users+resources. By specifying *bias*, you can choose how much of the traffic should be routed
-	- Latency routing: serves user requests from the AWS region with lowest latency. Users from the same location might get sent to different regions
-	- Health checking
-		+ Active-active failover: when you want all of your resources to be available the majority of the time. When a resource becomes unavailable, Route 53 can detect that it's unhealthy and stop including it when responding to queries.
-		+ Active-passive failover: when you want a primary resource or group of resources to be available the majority of the time and you want a secondary resource or group of resources to be on standby in case all the primary resources become unavailable. 
+> DNS routing
+
+* Simple routing: used for single resources that are performing given functions in your domain. Can't create multiple records with the same name for this type
+* Weighted routing: define multiple records for the same (sub-)domain name and choose how much traffic is routed to each one of them. Useful for load balancing
+* Geolocation routing: route traffic based on the grographic location of *users*
+* Geoproximity routing: routes traffic based on the geographic location of the *users+resources*. By specifying *bias*, you can choose how much of the traffic should be routed
+* Latency routing: serves user requests from the AWS region with lowest latency. Users from the same location might get sent to different regions
+  
+> Health checking
+
+* Active-active failover: when you want all of your resources to be available the majority of the time. When a resource becomes unavailable, Route 53 can detect that it's unhealthy and stop including it when responding to queries
+* Active-passive failover: when you want a primary resource or group of resources to be available the majority of the time and you want a secondary resource or group of resources to be on standby in case all the primary resources become unavailable
 
 Each record includes the name of the (sub)domain, a record type (A, M2..) and other info.
 
----
-
-To set up DNS failover to a static website, use Route 53 with the failover option to a static S3 website bucket or CloudFront distribution.
-
-To route traffic to a website hosted on a S3 bucket: the bucket should be configured to host a static website, the bucket name = domain/subdomain name. You need a registered domain name (you can use Route 53 for that), and Route 53 must be the DNS service for the domain.
-
-Security groups are stateful, everything is blocked by default. the security group specifies what's allowed.
-
-VPC endpoints for Amazon S3 provide secure connections to S3 buckets that do not require a gateway or NAT instances.
-
-
-### 3.5. VPC
+* To set up DNS failover to a static website, use Route 53 with the failover option to a static S3 website bucket or CloudFront distribution
+* To route traffic to a website hosted on a S3 bucket: the bucket should be configured to host a static website, the bucket name = domain/subdomain name. You need a registered domain name (you can use Route 53 for that), and Route 53 must be the DNS service for the domain
 
 To check all healthy instances, use multivalue answer routing policy to help distribute DNS responses across multiple resources. For example, use multivalue answer routing when you want to associate your routing records with a Route 53 health check.
-
-Inbound rules for EC2 instances are evaluated starting the lowest numbered rule:
-
-* If rule #100 says allow and rule #* says deny, #100 is evaluated first -> allow. if source is allowed on rule #100, it won't further evaluate rule #101 etc.
-
-If an EC2 inside a VPC doesn't have an associated DNS hostname, first enable the DNS resolution and DNS hostname on the VPC configuration
-
-* Peering connection: allows connection just within the VPCs, not with the connections that the other VPC has
-	- To connect instances between 2 different VPs, set up peering connection + re-configure route table's target and destination of the instances' subnet
-* VPC endpoint: connect the VPC to AWS resources by PrivateLink without requiring any Internet gateway or so. Traffic between your VPC and the other services does not leave the Amazon network.
-	- There are two types of VPC endpoints: interface endpoints and gateway endpoints. You should create the type of VPC endpoint required by the supported service. As a rule of thumb, most AWS services use VPC Interface Endpoint except for S3 and DynamoDB, which use VPC Gateway Endpoint.
-* Transit gateway: connect VPCs and on-prem networks, centrally manage point-to-point connectivity. You only create and manage 1 connection from the central gateway to each VPC/on-prem, and transit gateway acts like a hub that controls traffic
-	- Without transit gateway, you'd need peering connection between all VPCs + attaching a VPN to each individual VPC
-
-![image.png](https://media.tutorialsdojo.com/transit-gateway-Inter-Region-Peering.jpg)
-
----
-
-An Elastic Fabric Adapter (EFA) is a network device that you can attach to an EC2 instance to accelerate HPC apps.
-
-### 3.6. VPN
-
-A VPN allows you to connect your Amazon VPC to other remote networks securely using private sessions with IP security (IPSec) or transport layer security (TLS) tunnels. Maximum 2 tunnels and this can't be changed. But if you associate VPCs to an Equal Cost Multipath Routing (ECMR)-enabled transit gateway, you can attach additional VPN tunnels to it.
-
-* AWS Site-to-Site VPN: to connect on-prem and AWS, cheap option with limited bandwidth and limited traffic.
-* AWS Direct Connect: private network to connect on-prem and AWS, through Ethernet fiber-optic. Supports Transit Gateway. More bandwidth than Site-to-Site VPN
-
-To connect from on-prem to VPCs with a VPN, the customer side needs a Customer Gateway.
-
-![networking.png](https://img-c.udemycdn.com/redactor/raw/2018-10-27_22-45-01-dbcb3de60063eaba73e8d2d12c61d6dc.png)
-
-* Security group: firewall for EC2 instances
-	- Supports allow rules only
-* NACL (network access control list): firewall for associated subnets, for the whole subnet
-	- Supports allow + deny rules
-
-
-### 3.7. Subnets
-
-Each subnet maps to a single AZ, and each subnet is automatically associated with the main route table for the VPC.
-
-To create an IPv6 subnet, you need to create IPv4 subnet first.
-
-For 2 EC2 instances inside a VPC to communicate (each instance in its own subnet), the Network ACL should allow communication between the 2 subnets and the security groups allow the app host to communicate to the other instance on the right port and protocol.
-
-The online application must be in public subnets to allow access from clients' browsers. The database cluster must be in private subnets to meet the requirement that there be no access from the Internet. A NAT Gateway is gives private subnets access to the Internet. **NAT Gateways must be deployed in public subnets.** NAT Gateways can be costly. For resouces in various AZs, to improve resilieny, create one NAT Gateway per AZ and configure routing so that resources use the NAT in their AZ.
-
-* Internet Gateway: allows instances with public IPs to access the internet.
-	- A subnet is deemed to be a public subnet if it has a route table that directs traffic to the internet gateway
-	- Egress-only Internet Gateway: used for VPCs with IPv6
-	- Entry in route table: 0.0.0.0/0 -> my_internet_gateway
-* NAT Gateway: allows instances with no public IPs to access the internet. Internet traffic can't access the instances. Can't be associated with security groups. Used only for IPv4
-
-
-An ALB sends requests to healthy instances only. It performs periodic health checks on targets in a target group, if an instance fails the health check a configurable amount of times it'll be marked as unhealthy and won't receive traffic until it passes another health check.
-
-An ENI (elastic network interface) is a logical networking component in a VPC that represents a virtual network card. It includes a primary private IPv4 address, 1+ secondary private IPv4 addresses, 1 Elastic IPv4 per private IPv4 address, 1 public IPv4, 1+ IPv6.
 
 To route traffic to an ELB load balancer, use Route 53, create an alias record that points to the LB. It's similar to the CNAME record but o can create the alias record for the root domain + subdomains (CNAME can only be used for subdomains). To enable IPv6 resolution, create a second resource record
 
@@ -486,9 +408,75 @@ To route traffic to an ELB load balancer, use Route 53, create an alias record t
 * Alias type with "A" record set: for domains
 * Alias type with "AAAA" record set: for subdomains
 
----
+### 3.5. VPC
 
-To allow only clients connecting from the IP addres XXX should have access to the host, set the security group inbound rule, protocol tcp, range-22, source XXX/32. /32 is to specify one IP address, /0 refers to the entire network.
+Virtual private cloud.
+
+* A VPC spans all the AZs in the region. After creating a VPC, you can add one or more subnets in each AZ
+* A VPC allows you to specify an IP address range for the VPC, add subnets, associate security groups, and configure route tables
+* A subnet is a range of IP addresses in your VPC. You can launch AWS resources into a specified subnet
+* Use a public subnet for resources that must be connected to the internet, and a private subnet for resources that won’t be connected to the internet
+* To protect the AWS resources in each subnet, use security groups and network access control lists (ACL)
+* ENI (elastic network interface): logical networking component in a VPC that represents a virtual network card. It includes a primary private IPv4 address, 1+ secondary private IPv4 addresses, 1 Elastic IPv4 per private IPv4 address, 1 public IPv4, 1+ IPv6
+
+> Subnets
+
+Each subnet maps to a single AZ, and each subnet is automatically associated with the main route table for the VPC.
+
+* To create an IPv6 subnet, you need to create IPv4 subnet first
+* For 2 EC2 instances inside a VPC to communicate (each instance in its own subnet), the Network ACL should allow communication between the 2 subnets and the security groups allow the app host to communicate to the other instance on the right port and protocol
+
+> Security groups and NACL
+
+* Security group: firewall for *EC2 instances*
+	- They're stateful, everything is blocked by default. Supports allow rules only
+	- Inbound rules for EC2 instances are evaluated starting the lowest numbered rule: if rule #100 says allow and rule #* says deny, #100 is evaluated first -> allow. if source is allowed on rule #100, it won't further evaluate rule #101 etc
+	- To allow only clients connecting from the IP address XXX should have access to the host, set the security group inbound rule, protocol tcp, range-22, source XXX/32. /32 is to specify one IP address, /0 refers to the entire network
+* NACL (network access control list): firewall for associated *subnets*, for the whole subnet
+	- Supports allow + deny rules
+
+> Connect from VPC to the Internet
+
+* Internet Gateway: allows instances with public IPs to access the internet
+  * A subnet is deemed to be a public subnet if it has a route table that directs traffic to the internet gateway
+  * Egress-only Internet Gateway: used for VPCs with IPv6
+  * Entry in route table: 0.0.0.0/0 -> my_internet_gateway
+* NAT Gateway: allows subnets access to the Internet
+  * allows instances with no public IPs to access the internet. Internet traffic can't access the instances
+  * Can't be associated with security groups
+  * Used only for IPv4
+  * Must be deployed in a public subnet
+
+> Connection between 2 VPCs
+
+Peering connection: allows connection just within the VPCs, not with the connections that the other VPC has
+
+To connect instances between 2 different VPCs, set up peering connection + re-configure route table's target and destination of the instances' subnet
+
+> Connect from VPC to AWS resources
+
+* VPC endpoint: connect the VPC to AWS resources by PrivateLink without requiring an Internet gateway. Traffic between your VPC and the other services does not leave the Amazon network. 
+VPC endpoints for Amazon S3 provide secure connections to S3 buckets that do not require a gateway or NAT instances.
+	- Interface endpoint: used by most AWS resources
+	- Gateway endpoint: used by S3 and DynamoDB
+
+> Connect VPCs and on-prem networks
+
+* Transit gateway: connect VPCs and on-prem networks, centrally manage point-to-point connectivity. You only create and manage 1 connection from the central gateway to each VPC/on-prem, and transit gateway acts like a hub that controls traffic
+	- Without transit gateway, you'd need peering connection between all VPCs + attaching a VPN to each individual VPC
+
+![image.png](https://media.tutorialsdojo.com/transit-gateway-Inter-Region-Peering.jpg)
+
+> Securely connect on-prem and VPCs with VPN
+
+A VPN allows you to connect your Amazon VPC to other remote networks securely using private sessions with IP security (IPSec) or transport layer security (TLS) tunnels. Maximum 2 tunnels and this can't be changed. But if you associate VPCs to an Equal Cost Multipath Routing (ECMR)-enabled transit gateway, you can attach additional VPN tunnels to it.
+
+* AWS Site-to-Site VPN: to connect on-prem and AWS, cheap option with limited bandwidth and limited traffic.
+* AWS Direct Connect: private network to connect on-prem and AWS, through Ethernet fiber-optic. Supports Transit Gateway. More bandwidth than Site-to-Site VPN
+
+To connect from on-prem to VPCs with a VPN, the customer side needs a Customer Gateway.
+
+![networking.png](https://img-c.udemycdn.com/redactor/raw/2018-10-27_22-45-01-dbcb3de60063eaba73e8d2d12c61d6dc.png)
 
 > Windows Bastion
 
@@ -513,11 +501,18 @@ Can be used to use the trusted IPs as Elastic IP addresses (EIP) to the NLB.
 	- AWS Firewall manager: simplify WAF administration and maintenance tasks across multiple accounts and resources
 	- To mitigate DDoS: create a cloudfront distribution, set an ALB as origin. Create a rate-based ACL rule using WAF and associate it to the cloudfront
 	- WAF & ACL: can allow specific IP addresses, and block requests from a specific country using a geo match condition
-* Amazon Macie is a ML-powered service that monitors and detects usage patterns on S3 data, it can detect anomalies, risk of unauthorized access or inadvertent data leaks. It can recognize PII (personally identifiable info) or IP.
+
+> Encryption
+
+Client-side encryption means encrypting data before sending it to AWS, useful for cases where master key and unencrypted data can't be sent to AWS.
+
+> AWS Secrets manager
+
+Secrets can be db credentials, passwords, API keys etc. It allows automatic rotation for all the credentials. Secrets Manager enables you to replace hardcoded credentials with an API call to the Secrets Manager.
 
 ### 4.1. IAM
 
-Default policy is everything denied, this is overruled by an explicit allow. This is overruled by an explicit deny. Each policy contains 1+ statements. Statement contains:
+Default policy is everything denied, which can be overruled by an explicit allow, which can overruled by an explicit deny. Each policy contains 1+ statements. Statement contains:
 
 * Effect: allow/deny
 * Action: list of actions
@@ -529,68 +524,69 @@ Policies can be:
 * Resource based: attached to a resource
 	- Needs a principal: for which account/user/role is getting the effect
 
-If a company is using Active Directory in their on-premise system, AWS Directory Service AD connector for easier integration. If the roles on-prem are already assigned using groups, in AWS use IAM roles or use Microsoft AD federation service.
+> Import IAM from on-prem
+
+If a company is using Active Directory in their on-premise system, use AWS Directory Service AD connector for easier integration. If the roles on-prem are already assigned using groups, in AWS use IAM roles or use Microsoft AD federation service.
 
 Use IAM users only when creating new credentials, if the company already has then on-premises, they can be imported some other way.
 
-IAM groups is a collection os IAM users that lets you specify permissions for multiple users.
+> Manage access centrally
 
-To manage AWS resources centrally, use AWS organizations and AWS RAM (resource access manager) which enables you to share resources with any account or within organizations. You can share AWS Transit Gateways, Subnets, AWS License Manager configurations, and Amazon Route 53 Resolver rules resources with RAM.
+To manage AWS resources centrally, use AWS organizations and AWS RAM (resource access manager) which enables you to share resources with any account or within organizations. You can share AWS Transit Gateways, Subnets, AWS License Manager configurations, and Amazon Route 53 Resolver rules resources with RAM
+
+---
 
 MySQL and PostgreSQL dbs instance can be authenticated with IAM DB authentication and then you only need an authentication token to access it.
 
 [awsu.me](https://awsu.me) is a CLI tool to work with different roles in AWS.
 
-* *Trusted advisor*: reviews permissions for unnecessary rights or best practice violations and checks that you've enabled AWS security features for services.
-* *Policy simulator*: build, validate and troubleshoot policies.
+* *Trusted advisor*: reviews permissions for unnecessary rights or best practice violations and checks that you've enabled AWS security features for services
+* *Policy simulator*: build, validate and troubleshoot policies
 
-### 4.2. Encryption
+---
 
-If the encryption keys must be stored on premises, use SSE-C (server-side, customer provided keys) but in this case the key is sent to AWS as part of the request. or use client-side encryption to provide at-rest encryption.
-
-If the master key and the unencrypted data can't be sent to AWS, we need client-side encryption.
-
-Client-side encryption means encrypting data before sending it to AWS.
-
-### 4.3. AWS Secrets manager
-
-Secrets can be db credentials, passwords, API keys etc. It allows automatic rotation for all the credentials. Secrets Manager enables you to replace hardcoded credentials with an API call to the Secrets Manager.
+* SSO: single sign-on, central management of access to AWS accounts and resources
+* STS: security token service, create temporary credentials for AWS resources
+	- For OpenID Connect: Web Identity Federation
 
 ## 5. Management
 
-* CloudTrail: check who made changes/API calls to AWS resources, stores logs in S3, encrypted with SSE by default, you can also choose KMS key
-	- Management events: control management operations performed on resources in the AWS account
-	- Data events: resource operations performed on or within a resource, e.g. GetObject, DeleteObject.
-* AWS Config: assesses, audits and evaluates resources. Can automate the evaluation of recorded configs against desired configs. By creating an AWS Config rule, you can enforce your ideal configuration in your AWS account
-	- CloudTrail can track changes, can't enforce rules to comply with your policies
+* AWS Config assesses, audits and evaluates resources. Can automate the evaluation of recorded configs against desired configs. By creating an AWS Config rule, you can enforce your ideal configuration in your AWS account
+* OpsWorks: a configuration management service that provides managed instances of Chef and Puppet. Chef and Puppet are automation platforms that allow you to use code to automate the configurations of your servers
 
 ### 5.1. CloudWatch
 
-CloudWatch by default monitors CPU, network and disk read activity on EC2 instances. To get memory utilization, need to have a custom metric.
+CloudWatch by default monitors CPU, network and disk read activity on EC2 instances. To get memory utilization, need to have a custom metric. Install the CloudWatch agent in the EC2 instances that gathers all the metrics (memory usage for example). View the custom metrics in the CloudWatch console.
 
-Install the CloudWatch agent in the EC2 instances that gathers all the metrics (memory usage for e2.). View the custom metrics in the CloudWatch console.
+### 5.2. CloudTrail
+
+Check who made changes/API calls to AWS resources, stores logs in S3, encrypted with SSE by default, you can also choose KMS key
+
+* Management events: control management operations performed on resources in the AWS account
+* Data events: resource operations performed on or within a resource, e.g. GetObject, DeleteObject.
+
+CloudTrail can track changes, can't enforce rules to comply with your policies.
 
 ## 6. Analyics
 
-### 6.1. Kinesis
+> Kinesis
 
-Use Kinesis for real-time applications.
+Used Kinesis for streamling, real-time applications.
 
-Kinesis data streams is an ordered sequence of data records meant to be written to and read from in real-time. Data records are temporarily stored in shards in the stream, default is 24h.
-
-Kinesis data firehose loads streaming data into data stores and analytics tools e.g. S3, Redshift, Elasticsearch, Splunk. Only supports S3, Redshift, Elasticsearch and HTTP endpoint as destination. For DynamoDB, use streams.
+* Kinesis data streams: ordered sequence of data records meant to be written to and read from in real-time. Data records are temporarily stored in shards in the stream, default is 24h.
+* Kinesis data firehose: loads streaming data into data stores and analytics tools e.g. S3, Redshift, Elasticsearch, Splunk. Only supports S3, Redshift, Elasticsearch and HTTP endpoint as destination. For DynamoDB, use streams.
 
 To increase throughput, increase the number of shards by using the UpdateShardCount command. Throughput of streams and firehose is similar.
 
-### 6.2. EMR
+> EMR
 
 Managed cluster platform for big data framework (Apache Hadoop, Spark). Processes and analyzes vast amounts of data. EMR can be used to transform and move large amounts of data into and out of other AWS datstores and dbs.
 
-### 6.3. Glue
+> Glue
 
 AWS Glue is a serverless ETL service that crawls data, builds a data catalog, performs data preparation, transformation and ingestion. But doesn't allow the usage of big data frameworks.
 
-### 6.7. Redshift
+> Redshift
 
 Cloud data warehouse, it allows SQL and BI tools. You can run complex analytic queries against TB or PT of structured/semi-structured data.
 
@@ -598,51 +594,46 @@ Cloud data warehouse, it allows SQL and BI tools. You can run complex analytic q
 
 ### 7.1. SQS
 
-Decouples downstream operations that don't need to be synchronous. Messages for Lambda triggers can be aggregated together into batches, so one function invocation processes several messages at a time. Messages can contain up to 256kbs of text and can be in json/xml format.
+Simple queue service, decouples downstream operations that don't need to be synchronous.
 
-SQS polling is not real time. If we receive empty messages when polling, enable long polling: set ReceiveMessageWaitTimeSeconds to higher than 0. In long polling, SQS waits until a message is available before sending a response to a ReceiveMessage request.
-
-SNS works real-time. Lambda is a valid subscriber. EventBridge is not a valid SNS destination
-
-For users with different priority, create one SQS queue for each priority type. Consume messages from the high priority queue until it's empty, then the lower priority queue.
-
-You cannot set a priority to individual items in the queue.
+> Queue types
 
 * Standard queue: guarantees that messages are delivered at least once, no guarantee for order
+  * With Message groups and their identifiers, messages with the same ID are processed in order. Useful for processing messages of the same customer in order. Messages for one customer are delivered in FIFO, but messages for other customers are in parallel and FIFO is not guaranteed
 * FIFO: limit 300 transactions/s, guarantees ordering, guarantees one-time processing of all messages, support for message groups
+* DLQ (dead letter queues): if a message is considered unprocessable, it's sent to this queue. This helps unblock messaging systems without losing messages
 
-With Message groups and their identifiers, messages with the same ID are processed in order. Useful for processing messages of the same customer in order. Messages for one customer are delivered in FIFO, but messages for other customers are in parallel and FIFO is not guaranteed.
+> Features
 
-Visibility timeout: message is hidden from other consumers while it's being processed. If successfully processed, deleted. Else, message available again. Default timeout is 30s, max 12h.
+* Visibility timeout: message is hidden from other consumers while it's being processed. If successfully processed, deleted. Else, message available again. Default timeout is 30s, max 12h
+* Polling: retrieving messages from queue
+  * It's not real time. If we receive empty messages when polling, enable long polling: set ReceiveMessageWaitTimeSeconds to higher than 0. In long polling, SQS waits until a message is available before sending a response to a ReceiveMessage request.
+* Message priority: can't set a priority to individual messages
+  * For users with different priority, create one SQS queue for each priority type. Consume messages from the high priority queue until it's empty, then the lower priority queue.
+* Messages max size 256kb of text in json/xml format
+* Message retention period from 1 minute to 14 days, default is 4 days. After that, messages are deleted
+* Max in-flight msgs 120k, for FIFO 20k
 
-SQS has a retention period from 1 minute to 14 days, default is 4 days. After that, messages are deleted.
-
-DLQ: dead letter queues: if a message is considered unprocessable, it's sent to this queue. This helps unblock messaging systems without losing messages.
-
-Max in-flight msgs 120k, for FIFO 20k.
+Messages for Lambda triggers can be aggregated together into batches, so one function invocation processes several messages at a time.
 
 > Amazon SWF
 
-Ensures a task is never duplicated and is assigned only once. A specific task is given to only one worker. These facilities enable you to coordinate your workflow without worrying about duplicate, lost, or conflicting tasks.
+Task coordinator in the cloud, ensures a task is never duplicated and is assigned only once. A specific task is given to only one worker. These facilities enable you to coordinate your workflow without worrying about duplicate, lost, or conflicting tasks.
 
 ### 7.2. SNS
 
-SNS: the fanout scenario is when a message published to an SNS topic is replicated and pushed to multiple endpoints (SQS, HTTP(s), Lambda). This allows for parallel asynchronous processing:
+Simple notification service, publish-subscribe format. Notifications are delivered to clients using a "push" mechanism rather than to periodically check or "poll" for new information and updates.
 
-* you can create a topic and use two Amazon SQS queues to subscribe to the topic. If Amazon SNS receives an event notification, it will publish the message to both subscribers
-* For example, you can develop an application that publishes a message to an SNS topic whenever an order is placed for a product. Then, SQS queues that are subscribed to the SNS topic receive identical notifications for the new order. An Amazon Elastic Compute Cloud (Amazon EC2) server instance attached to one of the SQS queues can handle the processing or fulfillment of the order. And you can attach another Amazon EC2 server instance to a data warehouse for analysis of all orders received
+* It can send notifications to SMS, email, HTTP
+* Lambda is a valid subscriber, but EventBridge is not
 
-![image.png](https://d2908q01vomqb2.cloudfront.net/1b6453892473a467d07372d45eb05abc2031647a/2017/11/16/event_driven_sns_compute_slide05.png)
+Fanout scenario: when a message published to an SNS topic is replicated and pushed to multiple endpoints: SQS, HTTP(s), Lambda. This allows for parallel asynchronous processing:
+
+* Create a topic and use two Amazon SQS queues to subscribe to the topic. If Amazon SNS receives an event notification, it will publish the message to both subscribers
+* For example, you can develop an application that publishes a message to an SNS topic whenever an order is placed for a product. Then, SQS queues that are subscribed to the SNS topic receive identical notifications for the new order. An EC2 instance attached to one of the SQS queues can handle the processing or fulfillment of the order. And you can attach another Amazon EC2 instance to a data warehouse for analysis of all orders received
 
 ### 7.3. MQ
 
-MQ is used for migrating messaging services to the cloud quickly and easily.
+Service used for migrating messaging services to the cloud quickly and easily.
 
 Managed message broker service for Apache ActiveMQ that makes it easy to set up and operate message brokers in the cloud and hybrid architecture. The user case is when migrating to a managed message broker to automate software administration and maintenance, without having to re-write existing applications.
-
----
-
-* SSO: single sign-on, central management of access to AWS accounts and resources
-* STS: security token service, create temporary credentials for AWS resources
-	- For OpenID Connect: Web Identity Federation
-* OpsWorks: a configuration management service that provides managed instances of Chef and Puppet. Chef and Puppet are automation platforms that allow you to use code to automate the configurations of your servers
