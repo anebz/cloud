@@ -50,9 +50,9 @@
 * Amazon Machine Image (AMI) provides the info required to launch an instance
 * Instance metadata: instance ID, public keys, public IP address
 * Multi-AZ uses synchronous replication ensuring almost no RPO (recovery point objective). Read replicas take longer
-To monitor custom metrics, you must install the CloudWatch agent on the instance
+* To monitor custom metrics, you must install the CloudWatch agent on the instance
 * Billing
-  * On-demand: billed only when it's running. not when pending or stopping
+  * On-demand: billed only when it's running or stopping, not when pending
   * Spot: not billed if instance is in stopping state
   * Reserved instance: billed until end of the term even if it's terminated
 * There is a vCPU-based on-demand instance limit per region, if you want more you can submit the limit increase form to AWS and retry the failed requests once approved
@@ -68,9 +68,9 @@ To monitor custom metrics, you must install the CloudWatch agent on the instance
 
 * Standard reserved instance: more discount, can't exchange instances but can change AZ, scope, network platform, or instance size
 * Convertible reserved instance: flexibility to change families, OS types and tenancies
-Scheduled reserved instance: purchase capacity reservations that recur on a daily/weekly/monthly basis with a specified start time and duration, for a one-year term
+* Scheduled reserved instance: purchase capacity reservations that recur on a daily/weekly/monthly basis with a specified start time and duration, for a one-year term
 
-If you purchased a reserved instance but you want to stop it, terminate the RI asap to avoid getting billed at the on-demand price when it expires and go to AWS RI marketplace and sell it
+If you purchased a reserved instance but you want to stop it, terminate the RI asap to avoid getting billed at the on-demand price when it expires and sell it in the AWS RI marketplace
 
 > Networking
 
@@ -120,7 +120,7 @@ ECS can handle bursts in traffic but it takes minutes to set up new containers.
 
 ECS tasks can be run on CloudWatch events, e.g. when a file is uploaded to a certain S3 bucket using a S3 PUT operation. You can also declare a reduced number of ECS tasks whenever a file is deleted on the S3 bucket using the DELETE operation. First, create an Event **rule** for S3 that watches for object-level operations (PUT, DELETE). For object-level operations, it is required to create a CloudTrail trail first. On the Targets section, select the "ECS task" and input the needed values such as the cluster name, task definition and the task count. You need two rules – one for the scale-up and another for the scale-down of the ECS task count.
 
-To insert sensitive data into containers, you can store it in Secrets Manager secrests or System Manager Parameter Store parameters. Then you can reference them in the container definition. This feature is supported by tasks using both the EC2 and Fargate launch types.
+To insert sensitive data into containers, you can store it in Secrets Manager secrests or System Manager Parameter Store parameters and then you can reference them in the container definition.
 
 * Use the `secrets` container definition parameter to inject sensitive data as environment variables
 * Use the `secretOptions` container definition parameter to inject sensitive data in the log configuration of a container
@@ -146,7 +146,7 @@ Step functions: serverless orchestration, coordinates AWS services into serverle
 
 Other compute services:
 
-* Fargate: useful for microservices and launching containers in a serverless way, also helps with container cluster management. For ECS & Fargate, specify CPU and memory at the task definition.
+* Fargate: useful for microservices and launching containers in a serverless way, also helps with container cluster management. Removes the need to provision and manage servers, let you specify and pay for resources per application, and improve security through application isolation by design. For ECS & Fargate, specify CPU and memory at the task definition.
 * Beanstalk: PaaS service for webapps. Supports deployment from Docker containers. Capacity provisioning, load balancing, scaling and health monitoring are automatically handled.
 
 ## 2. Storage
@@ -217,9 +217,11 @@ With lifefycle policy, you can specify that the data is moved to another storage
 
 It can send notifications when events happen in a bucket. S3 event notifications are designed to be delivered at least once and to one destination only, e.g. SNS, SQS or Lambda but only one. You cannot attach two or more SNS topics or SQS queues for S3 event notification. If you need 2 SQS queues, set up a SNS queue and fan out to several SQSs.
 
+S3:ObjectRemoved:DeleteMarkerCreated is triggered when a delete marker is created for a versioned object and not when an object is deleted or a versioned object is permanently deleted.
+
 ### 2.2. EBS
 
-* They can only be attached to instances in the same AZ. Don't allow concurrent connections from multiple instances
+* **They can only be attached to instances in the same AZ**, therefore don't support multi-AZ resiliency. Don't allow concurrent connections from multiple instances
 * EBS volumes spport live config changes in production, you can change volume type, size and IOPS capacity without service interruptions
 * EBS volumes are off-instance, they can persist independently from the life of an instance. To prevent EBS from being deleted when an instance terminates, set the value of DeleteOnTermination to False
 
@@ -233,7 +235,7 @@ It can send notifications when events happen in a bucket. S3 event notifications
 | Cost | Moderate/high | Low |
 
 * General purpose: SSD-backed, used as boot volume
-* Provisioned IOPS: I/O intensive, low-latency. best for NoSQL or large RDBS. Require lots of storage
+* Provisioned IOPS: I/O intensive, low-latency. best for NoSQL or large RDBS. Requires lots of storage
 * Throughput optimized: large operations (large data), also magnetic
 * For infrequently accessed data, always cold HDD. Magnetic volume has lowest cost per GB
 
@@ -276,7 +278,7 @@ Aurora Global db is designed for globally distributed apps, it spans multiple re
 
 ### 2.5. DynamoDB
 
-DynamoDB is a multi-AZ, NoSQL db (suitable for key-value stores) that can handle frequent schema changes and doesn't have downtime with schema changes
+DynamoDB is a multi-AZ, NoSQL db (suitable for key-value stores) that can handle frequent schema changes and doesn't have downtime with schema changes. Automatically scales storage capacity. But write capacity can be increased.
 
 * DynamoDB + AppSync: to keep shared data updated in real time where users from around the world submit data
 * DynamoDB + ElastiCache: provide high performance storage of key-value pairs
@@ -327,7 +329,7 @@ If users need to authenticate, use Redis AUTH by creating a new Redis Cluster wi
 
 ### 3.1. CloudFront
 
-Low-latency and high-transfer speed content delivery network
+Low-latency and high-transfer speed content delivery network. Can't route the traffic to the closest edge location via an Anycast static IP address, for that use Global accelerator
 
 * Geo restriction: block access for certain countries
 * Cache: CloudFront serves an object from an edge location until the cache duration passes, then next time the edge location gets a user request for the object, CloudFront forwards the request to the origin server to verify that cache == latest version. The Cache-Control max-age directive lets you specify how long (in seconds) you want an object to remain in the cache before CloudFront gets the object again from the origin server
@@ -340,6 +342,10 @@ Low-latency and high-transfer speed content delivery network
 	- Origin request/response: only when cloudfront requests the origin/retrieves a response
 * Cloudfront functions: lightweight version of Lambda@Edge, less capabilities but better latency and cheaper. Executed in one of 218 edge locations. Used for access control & authorization, HTTP redirects, cache manipulation.
 	- Supports JS, max exec time is 1ms, max memory is 2MB, has no network access.
+
+---
+
+AWS Global accelerator: uses the AWS global network to optimize the path from your users to your applications, improving the performance of your TCP and UDP traffic. It can direct user traffic to the nearest application endpoint to the client.
 
 ### 3.2. API Gateway
 
@@ -430,10 +436,10 @@ Each subnet maps to a single AZ, and each subnet is automatically associated wit
 
 * Security group: firewall for *EC2 instances*
 	- They're stateful, everything is blocked by default. Supports allow rules only
-	- Inbound rules for EC2 instances are evaluated starting the lowest numbered rule: if rule #100 says allow and rule #* says deny, #100 is evaluated first -> allow. if source is allowed on rule #100, it won't further evaluate rule #101 etc
 	- To allow only clients connecting from the IP address XXX should have access to the host, set the security group inbound rule, protocol tcp, range-22, source XXX/32. /32 is to specify one IP address, /0 refers to the entire network
 * NACL (network access control list): firewall for associated *subnets*, for the whole subnet
 	- Supports allow + deny rules
+	- Inbound rules for NACL subnets are evaluated starting the lowest numbered rule: if rule #100 says allow and rule #* says deny, #100 is evaluated first -> allow. if source is allowed on rule #100, it won't further evaluate rule #101 etc
 
 > Connect from VPC to the Internet
 
@@ -474,7 +480,7 @@ A VPN allows you to connect your Amazon VPC to other remote networks securely us
 * AWS Site-to-Site VPN: to connect on-prem and AWS, cheap option with limited bandwidth and limited traffic.
 * AWS Direct Connect: private network to connect on-prem and AWS, through Ethernet fiber-optic. Supports Transit Gateway. More bandwidth than Site-to-Site VPN
 
-To connect from on-prem to VPCs with a VPN, the customer side needs a Customer Gateway.
+To connect from on-prem to VPCs with a VPN, the customer side needs a Customer Gateway, and an internet-routable IP address (static) of the customer gateway's external interface for the on-premises network.
 
 ![networking.png](https://img-c.udemycdn.com/redactor/raw/2018-10-27_22-45-01-dbcb3de60063eaba73e8d2d12c61d6dc.png)
 
@@ -482,13 +488,13 @@ To connect from on-prem to VPCs with a VPN, the customer side needs a Customer G
 
 A bastion host is a special purpose computer on a network specifically designed and configured to withstand attacks, it's equivalent to an EC2 instance. It should be in a public subnet with either a public or Elastic IP address with sufficient RDP or SSH access defined in the security group. Users log on to the bastion host via SSH or RDP and then use that session to manage other hosts in the private subnets.
 
-The best way to implement a bastion is to create a small EC2 instance which only has a security group only allowing access on port 22 from a particular IP address for maximum security. This blocks any SSH brute force attacks on the host. Use a private key (.pem) file to connect to the host. Recommended to create a small instance, since this only acts as a jump server to connect to other instances.
+The best way to implement a bastion is to create a small EC2 instance in a public subnet which only has a security group only allowing access on port 22 from a particular IP address for maximum security. This blocks any SSH brute force attacks on the host. Use a private key (.pem) file to connect to the host. Recommended to create a small instance, since this only acts as a jump server to connect to other instances.
 
 > Elastic IP address
 
 Static IPv4 (can only connecto to NLB) address masks the failure of an instance by rapidly remapping the address to another instance. You can also specify the elastic IP in a DNS record of your domain, so that your domain points to your instance.
 
-Can be used to use the trusted IPs as Elastic IP addresses (EIP) to the NLB.
+Can be used to use the trusted IPs as Elastic IP addresses (EIP) to the network load balancer. EIPs can't be associated to application load balancers.
 
 ## 4. Security
 
@@ -511,6 +517,8 @@ Client-side encryption means encrypting data before sending it to AWS, useful fo
 Secrets can be db credentials, passwords, API keys etc. It allows automatic rotation for all the credentials. Secrets Manager enables you to replace hardcoded credentials with an API call to the Secrets Manager.
 
 ### 4.1. IAM
+
+To assign a bunch of permissions to a bunch of IAM users, create an IAM group and assign the policy to the group. IAM roles are for resources
 
 Default policy is everything denied, which can be overruled by an explicit allow, which can overruled by an explicit deny. Each policy contains 1+ statements. Statement contains:
 
@@ -548,6 +556,7 @@ MySQL and PostgreSQL dbs instance can be authenticated with IAM DB authenticatio
 * SSO: single sign-on, central management of access to AWS accounts and resources
 * STS: security token service, create temporary credentials for AWS resources
 	- For OpenID Connect: Web Identity Federation
+	- Can be used for dealing with LDAP situations
 
 ## 5. Management
 
@@ -563,7 +572,7 @@ CloudWatch by default monitors CPU, network and disk read activity on EC2 instan
 Check who made changes/API calls to AWS resources, stores logs in S3, encrypted with SSE by default, you can also choose KMS key
 
 * Management events: control management operations performed on resources in the AWS account
-* Data events: resource operations performed on or within a resource, e.g. GetObject, DeleteObject.
+* Data events: resource operations performed on or within a resource, e.g. GetObject, DeleteObject
 
 CloudTrail can track changes, can't enforce rules to comply with your policies.
 
@@ -589,6 +598,8 @@ AWS Glue is a serverless ETL service that crawls data, builds a data catalog, pe
 > Redshift
 
 Cloud data warehouse, it allows SQL and BI tools. You can run complex analytic queries against TB or PT of structured/semi-structured data.
+
+Redshift automatically and continuously backs up your data to S3. It can asynchronously replicate your snapshots to S3 in another region for disaster recovery. 
 
 ## 7. Messaging
 
@@ -618,7 +629,7 @@ Messages for Lambda triggers can be aggregated together into batches, so one fun
 
 > Amazon SWF
 
-Task coordinator in the cloud, ensures a task is never duplicated and is assigned only once. A specific task is given to only one worker. These facilities enable you to coordinate your workflow without worrying about duplicate, lost, or conflicting tasks.
+Task coordinator in the cloud, ensures a task is never duplicated and is assigned only once. A specific task is given to only one worker. These facilities enable you to coordinate your workflow without worrying about duplicate, lost, or conflicting tasks. Useful for creating decoupled architectures.
 
 ### 7.2. SNS
 
