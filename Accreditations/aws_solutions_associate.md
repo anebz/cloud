@@ -34,7 +34,7 @@
 	- [5. Management](#5-management)
 		- [5.1. CloudWatch](#51-cloudwatch)
 		- [5.2. CloudTrail](#52-cloudtrail)
-	- [6. Analyics](#6-analyics)
+	- [6. Analytics](#6-analytics)
 	- [7. Messaging](#7-messaging)
 		- [7.1. SQS](#71-sqs)
 		- [7.2. SNS](#72-sns)
@@ -60,7 +60,7 @@
 
 > Storage
 
-* Instance store volume and RAM: ephemeral, data is lost when instance is stopped
+* Instance store volume and RAM: ephemeral, data is lost when instance is stopped. RAID 0 configuration enables you to improve your storage volumes' performance by distributing the I/O across the volumes in a stripe
   * If data should be kept, enable hibernation and hibernate instance before shutdown. Snapshotting the instance won't help because RAM contents are reloaded
 * EBS and EFS are persistent. If you start and stop an EC2 instance, the EBS volume associated with it is preserved but the data is erased
 
@@ -82,7 +82,7 @@ If you purchased a reserved instance but you want to stop it, terminate the RI a
   * On the NACL (access to whole subnet), add inbound + outbound rule to allow SSH to instance
   	- NACL are stateless
   	- if you only enabled an Inbound rule in NACL, the traffic can only go in but the SSH response will not go out since there is no Outbound rule
-* To accelerate HPC apps, add an Elastic Fabric Adapter (EFA), which is a network device 
+* To accelerate HPC apps, add an Elastic Fabric Adapter (EFA), which is a network device but doesn't work for Windows instances. For Windows instances, use Elastic Network Adapter (ENA)
 
 #### 1.1.1. Autoscaling
 
@@ -120,7 +120,7 @@ ECS can handle bursts in traffic but it takes minutes to set up new containers.
 
 ECS tasks can be run on CloudWatch events, e.g. when a file is uploaded to a certain S3 bucket using a S3 PUT operation. You can also declare a reduced number of ECS tasks whenever a file is deleted on the S3 bucket using the DELETE operation. First, create an Event **rule** for S3 that watches for object-level operations (PUT, DELETE). For object-level operations, it is required to create a CloudTrail trail first. On the Targets section, select the "ECS task" and input the needed values such as the cluster name, task definition and the task count. You need two rules – one for the scale-up and another for the scale-down of the ECS task count.
 
-To insert sensitive data into containers, you can store it in Secrets Manager secrests or System Manager Parameter Store parameters and then you can reference them in the container definition.
+To insert sensitive data into containers, you can store it in Secrets Manager secrets or System Manager Parameter Store parameters and then you can reference them in the container definition.
 
 * Use the `secrets` container definition parameter to inject sensitive data as environment variables
 * Use the `secretOptions` container definition parameter to inject sensitive data in the log configuration of a container
@@ -156,10 +156,10 @@ Other compute services:
 Integrate the on-premises network to AWS, used for hybrid cloud storage, on-premises systems are kept. Enables Active Directory users to deploy storage on their workstations as a drive.
 
 * File Gateway: supports a file interface into S3, and you get a virtual software appliance on-prem. Supports protocols NFS and SMB. Don't use S3 API to access data moved to S3
-* Volume Gateway: cloud-backed storage volumes that you can mount as iSCSI devices from on-prem servers.
-  - Cached volumes: store data in S3, copy of frequently accessed subsets on-prem
-  - Stored volumes: store data on-prem, asynchronously backup snapshots to S3
-* Tape Gateway: archive backup to Glacier
+* Volume Gateway: cloud-backed storage volumes that you can mount as iSCSI devices from on-prem servers, uses EBS volumes
+  - Cached volumes: store data in S3, copy of frequently accessed subsets on-prem. used if you need access to the frequently accessed data subsets locally
+  - Stored volumes: store data on-prem, asynchronously backup snapshots to S3. used if you need low-latency access to your entire dataset
+* Tape Gateway: archive backup to Glacier, supports iSCSI
 
 > Data migration
 
@@ -174,13 +174,12 @@ Object type storage service. Supports up to 3500 PUT and 5500 GET requests per s
 > Storage types
 
 * S3 standard: no minimum storage duration charge
-* S3 Standard - Infrequent Access: is used for infrequently-accessed data, but rapid access. Not for backup. data should be in this mode for at least 30 days.
-* Standard IA and One Zone-IA: for infrequent access, the lifecycle policy can only transition data to this storage type *after 30 days of creation*. min data storage duration: 30 days
-* S3 Glacier (+ deep archive) *for archiving*
+* S3 Standard IA and One Zone-IA: for infrequent access, but rapid access. Not for backup. the lifecycle policy can only transition data to this storage type *after 30 days of creation*. min data storage duration: 30 days
+* S3 Glacier *for archiving*. Lifefycle policy can transition data to this storage type at any point
 	- Expedited retrieval: allows you to quickly access data if you have an urgent request. Provisioned capacity ensures that retrieval capacity for expedited retrievals is available when you need it.
 	- Glacier supports vault lock policy, which helps enforce regulatory and compliance requirements
 	- Glacier: min data duration: 90 days
-	- Glacier deep archive: min data storage duration: 180 days
+* Glacier deep archive: min data storage duration: 180 days
 
 With lifefycle policy, you can specify that the data is moved to another storage class (like for archiving).
 
@@ -198,6 +197,7 @@ With lifefycle policy, you can specify that the data is moved to another storage
 
 > Other info
 
+* Asynchronously replicates data in all AZs in a region
 * CORS (cross-origin resource sharing) allows webapps loaded in one domain to interact with resources in a different domain. For instance, to add JavaScript to the webapp
 * Cross-region replication needs to have versioning enabled first
 * S3 object lock allows you to store objects using a write-once-read-many (WORM) model. Changes to objects are allowed but their previous versions should be preserved and remain retrievable. If you enabled S3 Object Lock, you won't be able to upload new versions of an object. This feature is only helpful when you want to prevent objects from being deleted or overwritten for a fixed amount of time or indefinitely
@@ -218,6 +218,10 @@ With lifefycle policy, you can specify that the data is moved to another storage
 It can send notifications when events happen in a bucket. S3 event notifications are designed to be delivered at least once and to one destination only, e.g. SNS, SQS or Lambda but only one. You cannot attach two or more SNS topics or SQS queues for S3 event notification. If you need 2 SQS queues, set up a SNS queue and fan out to several SQSs.
 
 S3:ObjectRemoved:DeleteMarkerCreated is triggered when a delete marker is created for a versioned object and not when an object is deleted or a versioned object is permanently deleted.
+
+> S3 Transfer acceleration
+
+Transfer Acceleration enables fast, easy, and secure transfer of files over long distances between your client and your Amazon S3 bucket. Transfer Acceleration leverages Amazon CloudFront's globally distributed AWS Edge Locations. As data arrives at an AWS Edge Location, data is routed to your Amazon S3 bucket over an optimized network path.
 
 ### 2.2. EBS
 
@@ -265,13 +269,15 @@ Relational databaser service. Provides storage autoscaling to scale storage capa
 
 Relational db, supports dynamic storage scaling and can conduct table joins. Automatically scales to accomodate data growth. Can have more throughput than MySQL and PostgreSQL.
 
-An Aurora DB cluster consists of one or more DB instances and a cluster volume that manages the data for those DB instances. Each Aurora DB cluster can have up to 15 Aurora Replicas in addition to the primary DB instance. 
+An Aurora DB cluster consists of one or more DB instances and a cluster volume that manages the data for those DB instances. Each Aurora DB cluster can have up to 15 Aurora Replicas in addition to the primary DB instance.
+
+If you have an Amazon Aurora Replica in the same or a different Availability Zone, when failing over, Amazon Aurora flips the canonical name record (CNAME) for your DB Instance to point at the healthy replica, which in turn is promoted to become the new primary. But if you only have one instance, Aurora will attempt to create a new DB Instance in the same Availability Zone as the original instance. This replacement of the original instance is done on a best-effort basis and may not succeed, for example, if there is an issue that is broadly affecting the Availability Zone
 
 Aurora serverless DB cluster: DB cluster that automatically starts up, shuts down and scales up/down based on the app's needs. It's a simple, cost-effective option for infrequent, intermittent sporadic or unpredictable workloads. You can create a db endpoint without specifying the DB instance class size, you only set the min and max capacity. The endpoint connects to a proxy fleet that routes the workload to a fleet of resources that are automatically scaled.
 
 A non-Serverless DB cluster for Aurora is called a provisioned DB cluster.
 
-Aurora Global db is designed for globally distributed apps, it spans multiple regions. It supports storage-based replication (RPO) with a latency of <1s. If there's an unplanned outage, one of the secondary regions you assigned can be promoted to read and write capabilities (RPO) in <1min. Consists of one primary AWS Region where your data is mastered, and one read-only, secondary AWS Region.
+Aurora Global db is designed for globally distributed apps, it spans multiple regions. It supports storage-based replication (RPO) with a latency of <1s. If there's an unplanned outage, one of the secondary regions you assigned can be promoted to read and write capabilities (RTO) in <1min. Consists of one primary AWS Region where your data is mastered, and one read-only, secondary AWS Region.
 
 * Reader endpoint: load-balances each connection request among the Aurora replicas, read-only connections
 * Cluster/writer endpoint: connects to the primary db instance, used for write operations
@@ -290,7 +296,7 @@ DynamoDB is a multi-AZ, NoSQL db (suitable for key-value stores) that can handle
 
 > Capacity
 
-* Provisioned capacity: specify the capacity units for the table and get billed for them. Useful foor steady load or known patterns
+* Provisioned capacity: specify the capacity units for the table and get billed for them. Useful for steady load or known patterns
 * On-demand: paying per request (good for unpredictable traffic). Pricing is pay-per-request for read and write requests
 
 > Partitions
@@ -447,22 +453,23 @@ Each subnet maps to a single AZ, and each subnet is automatically associated wit
   * A subnet is deemed to be a public subnet if it has a route table that directs traffic to the internet gateway
   * Egress-only Internet Gateway: used for VPCs with IPv6
   * Entry in route table: 0.0.0.0/0 -> my_internet_gateway
-* NAT Gateway: allows subnets access to the Internet
+* NAT Gateway: allows subnets access to the Internet, managed by AWS, scales based on demand
   * allows instances with no public IPs to access the internet. Internet traffic can't access the instances
   * Can't be associated with security groups
   * Used only for IPv4
   * Must be deployed in a public subnet
+* NAT Instance: managed by the user with no auto scaling
 
 > Connection between 2 VPCs
 
-Peering connection: allows connection just within the VPCs, not with the connections that the other VPC has
-
-To connect instances between 2 different VPCs, set up peering connection + re-configure route table's target and destination of the instances' subnet
+* Peering connection: allows connection just within the VPCs, not with the connections that the other VPC has
+  * If B peers to A and C, A and C aren't connected
+* CIDR-ranges should not overlap
+* To connect instances between 2 different VPCs, set up peering connection + re-configure route table's target and destination of the instances' subnet
 
 > Connect from VPC to AWS resources
 
-* VPC endpoint: connect the VPC to AWS resources by PrivateLink without requiring an Internet gateway. Traffic between your VPC and the other services does not leave the Amazon network. 
-VPC endpoints for Amazon S3 provide secure connections to S3 buckets that do not require a gateway or NAT instances.
+* VPC endpoint: connect the VPC to AWS resources (that aren't part of VPC) by PrivateLink without requiring an Internet gateway. Traffic between your VPC and the other services does not leave the Amazon network. VPC endpoints for Amazon S3 provide secure connections to S3 buckets that do not require a gateway or NAT instances.
 	- Interface endpoint: used by most AWS resources
 	- Gateway endpoint: used by S3 and DynamoDB
 
@@ -576,11 +583,11 @@ Check who made changes/API calls to AWS resources, stores logs in S3, encrypted 
 
 CloudTrail can track changes, can't enforce rules to comply with your policies.
 
-## 6. Analyics
+## 6. Analytics
 
 > Kinesis
 
-Used Kinesis for streamling, real-time applications.
+Used Kinesis for streaming, **real-time** applications.
 
 * Kinesis data streams: ordered sequence of data records meant to be written to and read from in real-time. Data records are temporarily stored in shards in the stream, default is 24h.
 * Kinesis data firehose: loads streaming data into data stores and analytics tools e.g. S3, Redshift, Elasticsearch, Splunk. Only supports S3, Redshift, Elasticsearch and HTTP endpoint as destination. For DynamoDB, use streams.
