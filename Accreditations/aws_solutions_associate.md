@@ -441,11 +441,12 @@ Each subnet maps to a single AZ, and each subnet is automatically associated wit
 > Security groups and NACL
 
 * Security group: firewall for *EC2 instances*
-	- They're stateful, everything is blocked by default. Supports allow rules only
-	- To allow only clients connecting from the IP address XXX should have access to the host, set the security group inbound rule, protocol tcp, range-22, source XXX/32. /32 is to specify one IP address, /0 refers to the entire network
+  * They can allow inbound/outbound access from other security groups
+  * They're stateful, everything is blocked by default. Supports allow rules only
+  * To allow only clients connecting from the IP address XXX should have access to the host, set the security group inbound rule, protocol tcp, range-22, source XXX/32. /32 is to specify one IP address, /0 refers to the entire network
 * NACL (network access control list): firewall for associated *subnets*, for the whole subnet
-	- Supports allow + deny rules
-	- Inbound rules for NACL subnets are evaluated starting the lowest numbered rule: if rule #100 says allow and rule #* says deny, #100 is evaluated first -> allow. if source is allowed on rule #100, it won't further evaluate rule #101 etc
+  * Supports allow + deny rules
+  * Inbound rules for NACL subnets are evaluated starting the lowest numbered rule: if rule #100 says allow and rule #* says deny, #100 is evaluated first -> allow. if source is allowed on rule #100, it won't further evaluate rule #101 etc
 
 > Connect from VPC to the Internet
 
