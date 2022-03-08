@@ -1,21 +1,26 @@
-# Cloud learning ☁️
+# Cloud learning ☁️📚
 
 [![made-with-Markdown](https://img.shields.io/badge/Made%20with-Markdown-1f425f.svg)](http://commonmark.org)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/anebz/cloud/graphs/commit-activity)
-[![Ask me anything](https://img.shields.io/badge/Ask%20me-anything-1abc9c.svg)](https://www.twitter.com/aberasategi)
+[![Ask me anything](https://img.shields.io/badge/Ask%20me-anything-1abc9c.svg)](https://www.twitter.com/anebzt)
 
-This is a repository of notes and resources for cloud learning, primarily AWS.
+![ ](https://images.unsplash.com/photo-1494599948593-3dafe8338d71)
 
-## AWS certificates
+This repository contains **certification notes** 🧑‍🎓 and resources for learning cloud.
 
-1. [AWS certified cloud practitioner](Accreditations/aws_cloud_practitioner.md): [[pdf]](Accreditations/aws_cloud_practitioner.pdf)
-2. [AWS cloud economics accreditation](Accreditations/aws_cloud_economics.md): [[pdf]](Accreditations/aws_cloud_economics.pdf)
-3. [AWS developer associate](Accreditations/aws_developer_associate.md): [[pdf]](Accreditations/aws_developer_associate.pdf)
+## AWS certifications
 
-## Azure certificates
+1. AWS cloud economics accreditation: [Markdown notes](Certifications/aws_cloud_economics.md) | [PDF version](Certifications/aws_cloud_economics.pdf)
+2. ⭐️ AWS certified cloud practitioner: [Markdown notes](Certifications/aws_cloud_practitioner.md) | [PDF version](Certifications/aws_cloud_practitioner.pdf)
+3. ⭐️⭐️ AWS developer Associate: [Markdown notes](Certifications/aws_developer_associate.md) | [PDF version](Certifications/aws_developer_associate.pdf)
+4. ⭐️⭐️ AWS solutions Associate: [Markdown notes](Certifications/aws_solutions_associate.md) | [PDF version](Certifications/aws_solutions_associate.pdf)
 
-1. [Azure AZ-900 fundamentals](Accreditations/az_900.md): [[pdf]](Accreditations/az_900.pdf)
-2. [Azure DP-100 data scientist associate](Accreditations/az_dp_100.md): [[pdf]](Accreditations/az_dp_100.pdf)
+## Azure certifications
+
+1. 🔷 Azure AZ-900 Azure fundamentals: [Markdown notes](Certifications/az_900.md) | [PDF version](Certifications/az_900.pdf)
+2. 🔷 Azure AI-900 Azure AI fundamentals: [Markdown notes](Certifications/az_ai_900.md) | [PDF version](Certifications/az_ai_900.pdf)
+3. 🔷🔷 Azure DP-100 Data Scientist Associate: [Markdown notes](Certifications/az_dp_100.md) | [PDF version](Certifications/az_dp_100.pdf)
+4. 🔷🔷 Azure AI-102 AI Engineer Associate: [Markdown notes](Certifications/az_ai_102.md) | [PDF version](Certifications/az_ai_102.pdf)
 
 ## Learning
 
@@ -49,6 +54,10 @@ This is a repository of notes and resources for cloud learning, primarily AWS.
   * Route53 custom domains (page 129)
   * Migrate endpoint from HTTP to HTTPS (page 139)
   * Network security: NAT, ASGs (page 159)
+* ❗️❗️ [The Cloud Resume Challenge](https://cloudresumechallenge.dev/)
+  * ⭐️ AWS version contains: S3, CloudFront, Route 53, ACM, DynamoDB, Lambda, API Gateway, AWS SAM and Github Actions
+  * 🔷 Azure version contains: Azure Storage, CDN, Azure DNS, CosmosDB, Azure API, Functions, ARM and Github Actions
+  * 🔻GCP version contains: Google Cloud Storage, Cloud CDN, Cloud Domains, Firestore, API, Google Cloud Functions, Terraform and Cloud Build
 
 ## Cheatsheet
 
