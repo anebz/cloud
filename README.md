@@ -24,8 +24,6 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 
 ## Practice projects
 
-* ⭐️ [AWS: store in S3 bucket with Lambda, personal notes](Practice/cloudhealth_lambda_s3.md)
-* ⭐️ [AWS Lambda with Docker and Serverless, personal notes](Practice/lambda_docker_serverless.md)
 * ⭐️ [AWS Hands On tutorials](https://aws.amazon.com/getting-started/hands-on/)
   * ⭐️ [AWS Hands On: serverless web app](https://aws.amazon.com/getting-started/hands-on/build-serverless-web-app-lambda-apigateway-s3-dynamodb-cognito/)
 * ⭐️ [AWS ETL challenge](https://acloudguru.com/blog/engineering/cloudguruchallenge-python-aws-etl)
@@ -65,6 +63,9 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 * ⛴ [Kubernetes personal notes](Practice/kubernetes.md)
   * [Kubernetes API flow](Practice/k8s_api.jpg)
 * [JavaScript personal notes](Practice/javascript.md)
+* ⭐️ [AWS: Lambda, copy file from S3 to EFS, code](Practice/lambda_s3_to_efs.js)
+* ⭐️ [AWS: Lambda copy file from CloudHealth to S3, personal notes](Practice/cloudhealth_lambda_s3.md)
+* ⭐️ [AWS Lambda with Docker and Serverless, personal notes](Practice/lambda_docker_serverless.md)
 
 ## Tutorials
 
