@@ -129,3 +129,194 @@ more videos in the youtube playlist
 * Monitoring and alerting
 * Pods and the pod lifecycle
 * Customizing and extending the k8s API with admission controllers
+
+## EKS workshop
+
+Orchestration: from managing one application to managing a set of applications, important when something has a certain scale.
+
+docker: package apps, k8s: shift apps around, pool servers into a pool of resources. instead of thinking of servers, you start thinking in terms of apps.
+
+with container orchestrators, we describe what it should look like when it's done
+
+EKS is Amazon's k8s service, elastic k8s service. 
+
+we can run k8s in aws, in our data center, and we get the same experience.
+
+Nodes are machines that make up a k8s cluster, they can be physical or virtual.
+
+* Control panel-node type, making up a control plane, the brains of the cluster
+* Worker node type, making up the data plane, the actual container images (via pods)
+
+Object: records of intent, what we expect to see when everything is perfect. Once created the cluster does its best to ensure it exists as defined. The cluster's 'desired state'. A deployment can be an object.
+
+* Pod: a thin wrapper around 1+ containers. When containers should be scaled together, they should all be in one pod. If not, different pods
+* DaemonSet: type of deployment, implements a single instance of a pod on a worker node. for example only worker nodes that have a certain GPU
+* Deployment: details how to roll out (or roll back) across versions of your application
+* ReplicaSet: ensure a defined number of pods are always running
+* Job: ensures a pod properly runs to compilation
+* Service: maps a fixed IP address to a logical group of pods
+* Label: key/value pairs used for association and filtering
+
+## k8s architecture
+
+**kubectl** is a wrapper around the k8s api. The API connects to the data node via a **kubelet**
+
+## eks
+
+eks cluster creation workflow
+
+1. create eks cluster
+    * in eks, just a command
+    * in diy mode, creating up the control node takes more work
+    * create HA control plane
+    * IAM integration
+    * certificate management
+    * setup load balancer
+2. provision worker nodes
+3. launch add-ons
+4. launch workloads
+
+When you create an eks you target a vpc that's in your account
+
+new user workshop, pass nem
+https://361936660388.signin.aws.amazon.com/console
+log in with the account id, but workshop username and password
+
+https://us-west-2.console.aws.amazon.com/cloud9/home/product create environment
+it opens like a vscode inside aws
+
+my cloud9: name eksworkshop or sth https://us-west-2.console.aws.amazon.com/cloud9/ide/7c52aab599df4afb96d53a138fb27582
+
+```bash
+workshop:~/environment $ eksctl delete cluster --name eksworkshop-eksctl
+[ℹ]  eksctl version 0.31.0
+[ℹ]  using region us-west-2
+[ℹ]  deleting EKS cluster "eksworkshop-eksctl"
+[ℹ]  deleted 0 Fargate profile(s)
+[✔]  kubeconfig has been updated
+[ℹ]  cleaning up AWS load balancers created by Kubernetes objects of Kind Service or Ingress
+[ℹ]  2 sequential tasks: { delete nodegroup "nodegroup", delete cluster control plane "eksworkshop-eksctl" [async] }
+[ℹ]  will delete stack "eksctl-eksworkshop-eksctl-nodegroup-nodegroup"
+[ℹ]  waiting for stack "eksctl-eksworkshop-eksctl-nodegroup-nodegroup" to get deleted
+[ℹ]  will delete stack "eksctl-eksworkshop-eksctl-cluster"
+[✔]  all cluster resources were deleted
+```
+
+workshop position: https://www.eksworkshop.com/beginner/050_deploy/
+
+backend crystal and nodejs, frontend ruby
+
+## questions
+
+* last week ecs, today kubernetes. elastic container/kubernetes service
+* the environment in aws is it equivalent to the command line in our computer? or special access?
+
+
+deployment: how it should be deployed, service: how do services in the cluster gain access to this
+
+After running both backend services
+
+```bash
+workshop:~/environment/ecsdemo-crystal (master) $ kubectl get pods
+NAME                               READY   STATUS    RESTARTS   AGE
+ecsdemo-crystal-6d5f6f4b47-6t66n   1/1     Running   0          13s
+ecsdemo-nodejs-7dd8987798-n7zjp    1/1     Running   0          20m
+
+workshop:~/environment/ecsdemo-crystal (master) $ kubectl get services
+NAME              TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+ecsdemo-crystal   ClusterIP   10.100.102.92    <none>        80/TCP    21s
+ecsdemo-nodejs    ClusterIP   10.100.179.218   <none>        80/TCP    19m
+kubernetes        ClusterIP   10.100.0.1       <none>        443/TCP   34m
+```
+
+if we talk to the first IP address from the cluster and on port 80 it will port our traffic into any running pod that this service has, in this case, two. these backend services only get traffic from inside the cluster
+
+now frontend. this service needs to tak traffic external into the cluster --> it needs ingress.
+
+the kubernetes/service.yaml contains type: LoadBalancer: This will configure an ELB to handle incoming traffic to this service. for more sophisticated loadbalancers, we can use ingress
+
+service.yaml for frontend. backend is identical but except the LoadBalancer. Backend has the default type, which is ClusterIP: This Exposes the service on a cluster-internal IP. Choosing this value makes the service only reachable from within the cluster
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecsdemo-frontend
+spec:
+  selector:
+    app: ecsdemo-frontend
+  type: LoadBalancer
+  ports:
+   -  protocol: TCP
+      port: 80
+      targetPort: 3000
+```
+
+to deploy it
+
+```bash
+cd ~/environment/ecsdemo-frontend
+kubectl apply -f kubernetes/deployment.yaml
+kubectl apply -f kubernetes/service.yaml
+kubectl get deployment ecsdemo-frontend
+```
+
+to scale to 3 replicas
+
+```bash
+kubectl scale deployment ecsdemo-crystal --replicas=3
+```
+
+
+
+https://www.eksworkshop.com/beginner/070_healthchecks/
+
+
+### Hackathon
+
+not good to create a cluster with a user, because then the user can't be removed. if the user is removed, cluster is lost. so one way to do it is creating roles and assigning this role to the cluster, even if the user is removed, the cluster can be accessed
+
+1. assume role
+2. create cluster
+
+every time you want to access cluster, run command aws sts assume-role bla bla
+save aws_Access_key_id, aws_secret_Access_key, aws_session_token in env variables, restart terminal/vscode.
+whenever you assume the role, these 3 variables will change. you need to update them
+
+ekstcl command to create cluster with the role, according to the cluster policy `cluster.yaml` with the vpc id. this config is used to eksctl to create the cloudformation to create the cluster.
+
+load balancer in public subnet, workers in private subnet. and priv+pub x2 to ensure high availability
+
+
+assume role
+
+```bash
+aws sts assume-role --role-arn "arn:aws:iam::529376911423:role hackathon-eks-role" --role-session-name AWSCLI-Session
+```
+
+update env variables with these new variables access_id, secret_access_key, session_token to the role's.
+
+the way we did it, I overrule the user credentials in Users/aberasategi/.aws/credentials, so now I 'lost' my user.
+
+```bash
+aws eks update-kubeconfig --name hackaton-eksctl-team --region us-east-2
+kubectl cluster-info
+```
+
+cluster autoscaler when there's more demand, it communicates with aws autoscaler. tags of the aws autoscaler aren't complete
+
+
+kubectl get all -n default
+kubectl -n kube-system logs -f deployment.apps/cluster-autoscaler
+kubectl apply -f Desktop/nginx.yaml
+kubectl delete deployment cluster-autoscaler -n kube-system
+
+https://docs.aws.amazon.com/eks/latest/userguide/cluster-autoscaler.html
+https://aws.amazon.com/premiumsupport/knowledge-center/eks-cluster-autoscaler-setup/
+https://docs.aws.amazon.com/eks/latest/userguide/dashboard-tutorial.html
+
+aws sts assume-role --role-arn "arn:aws:iam::123456789012:role/example-role" --role-session-name AWSCLI-Session
+
+kubectl get pods --all-namespaces
+
+eksctl to create, delete, kubectl to manage

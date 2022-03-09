@@ -22,24 +22,55 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 3. 🔷🔷 Azure DP-100 Data Scientist Associate: [Markdown notes](Certifications/az_dp_100.md) | [PDF version](Certifications/az_dp_100.pdf)
 4. 🔷🔷 Azure AI-102 AI Engineer Associate: [Markdown notes](Certifications/az_ai_102.md) | [PDF version](Certifications/az_ai_102.pdf)
 
-## Learning
+## Practice projects
 
-* [Kubernetes](kubernetes.md)
-
-## Practice
-
-* [Save CloudHealth accounts status to S3 bucket with Lambda](Practice/cloudhealth_lambda_s3.md)
-* [AWS Lambda with Docker and Serverless](Practice/lambda_docker_serverless.md)
+* ⭐️ [AWS: store in S3 bucket with Lambda, personal notes](Practice/cloudhealth_lambda_s3.md)
+* ⭐️ [AWS Lambda with Docker and Serverless, personal notes](Practice/lambda_docker_serverless.md)
+* ⭐️ [AWS Hands On tutorials](https://aws.amazon.com/getting-started/hands-on/)
+  * ⭐️ [AWS Hands On: serverless web app](https://aws.amazon.com/getting-started/hands-on/build-serverless-web-app-lambda-apigateway-s3-dynamodb-cognito/)
+* ⭐️ [AWS ETL challenge](https://acloudguru.com/blog/engineering/cloudguruchallenge-python-aws-etl)
+* ⭐️ [AWS workshops](https://workshops.aws/)
+  * ⭐️ [AWS Serverless workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/b34eab03-4ebe-46c1-bc63-cd2d975d8ad4/en-US/)
+* ⭐️ [AWS Eventbox: serverless web app](https://www.eventbox.dev/published/lesson/innovator-island/)
+* ⭐️ [AWS: serverless data processing](https://www.eventbox.dev/published/lesson/emea-streaming-analytics/)
+* ⭐️ [AWS: cloud resume challenge](https://cloudresumechallenge.dev/docs/the-challenge/aws/)
+  * Contains: S3, CloudFront, Route 53, ACM, DynamoDB, Lambda, API Gateway, AWS SAM and Github Actions
+* 🔷 [Azure: cloud resume challenge](https://cloudresumechallenge.dev/docs/the-challenge/azure/)
+  * Contains: Azure Storage, CDN, Azure DNS, CosmosDB, Azure API, Functions, ARM and Github Actions
+* 🔷 [Azure Citadel: hands-on tutorials](https://www.azurecitadel.com/)
+* 🔷 [Azure networking labs](https://github.com/binals/azurenetworking)
+* 🔷 [Azure project: build a pet store](https://chtrembl.github.io/azure-cloud/petstore/)
+  * Contains: Azure DevOps, Functions, Kubernetes
+* 🔻 [GCP: cloud resume challenge](https://cloudresumechallenge.dev/docs/the-challenge/googlecloud/)
+  * Contains: Google Cloud Storage, Cloud CDN, Cloud Domains, Firestore, API, Google Cloud Functions, Terraform and Cloud Build
+* 🔻 [GCP codelabs: hands-on projects](https://codelabs.developers.google.com/cloud)
 
 ## Resources
 
-* [Lambda the Terraform way](https://github.com/nsriram/lambda-the-terraform-way)
+* ☁️ [Basic: Learn to cloud](https://learntocloud.guide)
+* ⭐️ [AWS Architecture center](https://aws.amazon.com/architecture/)
+* ⭐️ [AWS copilot CLI: toolkit for containerized apps in ECS and AWS Fargate](https://aws.github.io/copilot-cli/)
+* 🔷 [Azure Architecture center](https://docs.microsoft.com/en-us/azure/architecture/browse/)
+* 🔷 [Azure: learn for certifications](https://docs.microsoft.com/en-us/learn/)
+* 🔻 [GCP Architecture center](https://cloud.google.com/architecture)
+* 🔻 [GCP: learning for certifications](https://www.cloudskillsboost.google/)
+* 🟣 [Lambda the Terraform way](https://github.com/nsriram/lambda-the-terraform-way)
   * Similar [repo](https://github.com/antonbabenko/serverless.tf)
-* [AWS copilot CLI: toolkit for containerized apps in ECS and AWS Fargate](https://aws.github.io/copilot-cli/)
+* 🟣 [Terraform personal notes](Practice/terraform.md)
 * [Why the serverless revolution has stalled](https://www.infoq.com/articles/serverless-stalled/)
 * [DevOps exercises](https://github.com/bregman-arie/devops-exercises) and [DevOps resources](https://github.com/bregman-arie/devops-resources)
 * [Scool of SRE](https://linkedin.github.io/school-of-sre/)
+* [MLOps basics](https://github.com/graviraja/MLOps-Basics)
 * [Katacoda](https://www.katacoda.com/)
+* ⛴ [Kubernetes personal notes](Practice/kubernetes.md)
+  * [Kubernetes API flow](Practice/k8s_api.jpg)
+* [JavaScript personal notes](Practice/javascript.md)
+
+## Tutorials
+
+* [Containers for embedded systems](https://medium.com/@lsbenitezpereira/containers-for-embedded-systems-7c5929bacf1e)
+* [Managing containers with Azure IoT](https://medium.com/@lsbenitezpereira/managing-containers-with-an-iot-platform-4e9a4293a16)
+* [IaC in Azure](https://medium.com/@lsbenitezpereira/streamline-iot-projects-with-infrastructure-as-code-eb8921909c4c)
 
 ## Books
 
@@ -55,9 +86,6 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
   * Migrate endpoint from HTTP to HTTPS (page 139)
   * Network security: NAT, ASGs (page 159)
 * ❗️❗️ [The Cloud Resume Challenge](https://cloudresumechallenge.dev/)
-  * ⭐️ AWS version contains: S3, CloudFront, Route 53, ACM, DynamoDB, Lambda, API Gateway, AWS SAM and Github Actions
-  * 🔷 Azure version contains: Azure Storage, CDN, Azure DNS, CosmosDB, Azure API, Functions, ARM and Github Actions
-  * 🔻GCP version contains: Google Cloud Storage, Cloud CDN, Cloud Domains, Firestore, API, Google Cloud Functions, Terraform and Cloud Build
 
 ## Cheatsheet
 
