@@ -59,6 +59,7 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 * [DevOps exercises](https://github.com/bregman-arie/devops-exercises) and [DevOps resources](https://github.com/bregman-arie/devops-resources)
 * [Scool of SRE](https://linkedin.github.io/school-of-sre/)
 * [MLOps basics](https://github.com/graviraja/MLOps-Basics)
+* [MLOps: made with ML](https://madewithml.com/#mlops)
 * [Katacoda](https://www.katacoda.com/)
 * ⛴ [Kubernetes personal notes](Practice/kubernetes.md)
   * [Kubernetes API flow](Practice/k8s_api.jpg)
