@@ -720,4 +720,34 @@ processing_step = ProcessingStep(
     ]
     ...
 )
+
+from sagemaker.pytorch import PyTorch as PyTorchEstimator
+
+estimator = PyTorchEstimator(
+    entry_point='train.py',
+    source_dir='src',
+    role=role,
+    instance_count=train_instance_count,
+    instance_type=train_instance_type,
+    volume_size=train_volume_size,
+    py_version='py3',
+    framework_version='1.6.0',
+    hyperparameters=hyperparameters,
+    metric_definitions=metric_definitions,
+    input_mode=input_mode
+)
+
+training_step = TrainingStep(
+    name='Train',
+    estimator=estimator,
+    inputs={
+        'train':TrainingInput(
+            s3_data=processing_step.properties.ProcessingOutputConfig.Outputs['sentiment-train'].S3Output.S3Uri,
+            content_type='text/csv'
+        ),
+        'validation': TrainingInput(...)
+    }
+)
 ```
+
+## [Course 3: Optimize ML Models and Deploy Human-in-the-Loop Pipelines](https://www.coursera.org/learn/ml-models-human-in-the-loop-pipelines?specialization=practical-data-science)

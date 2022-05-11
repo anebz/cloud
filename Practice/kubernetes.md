@@ -1,322 +1,266 @@
-# Kubernetes
+# Kubernetes course
 
-1. [Concepts](#1-concepts)
+Video from [Techworld With Nana](https://www.youtube.com/watch?v=s_o8dwzRlu4)
 
-## 1 Concepts
+## Architecture
 
-Kubernetes is a distributed systems application environment for building and constructing distributed systems that span across many machines.
+* Main node, contains a handful of important master processes. It's the only point of access to the cluster, so you need a backup of the master
+  * API server, entrypoint to k8s cluster. This runs in a container too. Contains UI, API and CLI tools
+  * Controller manager: overview of what's happening in cluster, start a new node if another node was terminated, etc.
+  * Scheduler: ensures Pods replacement, it decides on which Node new Pod should be scheduled
+  * etcd: k8s backing store, config and status data. Contains snapshots of previous states. Holds the current status of any k8s component
+* Many worker nodes, each node has kubelet process running. Each node has different amount of containers running
+  * High workload and they need many resources
 
-### Node
+The virtual network spans all the nodes that are part of the cluster
 
-Runs containers and proxies service requests: docker, kubelet, proxy
+## Components
 
-### Pods
+### Pod
 
-* Collection of containers that are co-located on a single machine that share the same namespace
-* Users can set environment variables, mount storage, feed information into a cotainer
-* Pods run containers, each pod contains 1+ containers and controls the execution of them. When the containers exit, the pod dies
+Smallest unit in k8s, it is an abstraction over Docker containers, so you only make contact with the k8s layer. Usually 1 application per pod, like 1 pod for an app and 1 pod for the db. These 2 pods run in a node.
 
-### Scheduler
+The cluster is in a virtual network so each pod gets its own IP address.
 
-Schedules pods to run on nodes, global scheduler for long running jobs, best fit chosen based on pod requirements
+Pods are ephemeral, they die easy and then a new Pod is created in its place and it gets assigned a new IP address.
 
-### Replication controller
+### Volumes
 
-Manages a replicated set of pods, creates pods from a template, ensures desired number of pods are running. It enables online resizing and self-healing
+Stores db data persistently on local machine in pod, or remote (cloud, remote storage). If the Pod dies, the new Pod takes this persistent volume and all data is restored.
 
-### ReplicaSets
+K8s doesn't manage data persistance so if you want it, you have to set it up yourself.
 
-* A low-level type, higher-level are Deployments or DaemonSets
-* They manage the lifecycle of pods
-* They ensure that a set of identically configured pods are running at the desired replica count. If a pod drops off, the ReplicaSets brings a new one online as a replacement
+### Service
+
+Service is a permanent IP address that can be attached to each pod. Lifecycle of Pod and Service are not connected, the IP address remains after re-creation of Pods.
+
+External service opens the communication from external sources, so the app can be accessible through browser. But you would only certain pods to be open to the public, not the DB. You can create an external service for the external part of the app and internal service for the db. These services are a node-ip followed by a port. But we would want our URL to have a domain name and be secured through HTTPS.
+
+### Ingress
+
+A layer on top of service, the request from the Internet goes to Ingress first, and then to service.
+
+### ConfigMap
+
+ConfigMap is the external config of all your apps. It's connected to the Pod so it reads the URLs for apps that it needs. Db username and password are not appropriate for ConfigMaps, only for non-confidential
 
 ### Secrets
 
-* Base 64 encoded "at rest" but the data is automatically decoded when attached to a pod
-* Secrets can be attached as files or environment variables
-* They are used to store non-public information, such as tokens, certificates or passwords
-* They can be attached to pods at runtime so the secret data can be securely stored in the cluster
+Similar to ConfigMap but used to stored secret data like db credentials. This is the default, you can also enable the built-in security mechanism and encrypt it in base64 encoding format.
 
-### Deployments
+Secret connects to Pods so they can read the data
 
-* They support rolling updates and rollbacks, they can be paused
-* They are higher-order abstraction that control deploying and maintaining a set of pods
-* Behind the scenes, they use ReplicaSets to keep the pods running but deployments offer sophisticated logic for deploying, updating and scaling a set of pods within a cluster
+### Deployment
 
-### DaemonSets
+K8s replicates everything on different servers. The Service endpoint is the same for both servers, primary and secondary. Kubernetes includes a load balancer.
 
-* They can be used for installing or configuring software on each host node
-* They ensure that a copy of a pod is running on every node in the cluster. As the cluster grows and shrinks, the DaemonSet spreads these specially labelled pods across all nodes
+To set up replication, defined a blueprint/deployment for Pods and specify how many replicas you want to have. In practice you don't manage Pods, you manage Deployments.
 
-### Ingresses
+If one Pod dies, the service redirects the request to a healthy Pod.
 
-* They route traffic to and from the cluster. Internet <-> many clusters
-* They provide a single SSL endpoint for multiple application
-* One single external ingress point can accept traffic destined to many different internal services
+Databases have state (data) so to replicate them, all dbs should access to one storage to avoid data inconsistencies. Deployments used for stateless apps.
 
-### CronJobs
+### StatefulSet
 
-* They use common Cron syntax to schedule tasks
-* They are part of the Batch API for creating short lived non-server tools
-* They schedule the execution of pods, they are a good option for periodic tasks like backups, reports and automated tests
+To use with Stateful apps, mysql, elastic, mongodb. It replicates and scales Pods. Using StatefulSet is harder than Deployments, so people usually host DBs outside k8s cluster and only the stateless apps in the k8s cluster.
 
-### CRDs
-
-* They define a new resource type and inform Kubernetes about it
-* Once a new resource type is added, new instances of that resource can be created
-* The programmer can handle CRD changes. A common pattern is creating a custom controller that watches for new CRD instances, and responds accordingly
-* CRDs provide an extension mechanism that cluster operators and developers can use to create their own resource type
-
-### Checks
-
-* Liveness check: boolean, whether a pod should be automatically restarted
-* Readiness check: boolean, whether the ap is ready to serve
-
-## [Kubernetes basics](https://www.youtube.com/playlist?list=PLLasX02E8BPCrIhFrc_ZiINhbRkYMKdPT)
-
-## practice
-
-1. create deploy.yaml saying how many replicas I want (3)
-2. kubectl apply, 3 pods created, containers hosted on 3 VMs
-3. App is up and running, now I want to expose it to someone that will consume it. I create a service, a load balancer that takes traffic from the outside world or from another service from inside the cluster and load balances that traffic down to those containers
-4. The end-user can talk to the external IP address, traffic flows through the cloud load balancer to my service, the load balanced out to all my containers
-5. when scaling up and down, deployment is done in a rolling way. the user doesn't notice anything.
-6. When we change the deployment from v1 to v2, it takes some time to make effect. if it was immediate, where replicas are down and new replicas go up, the service might be briefly unavailable. if v2 has flaws and it's deployed immediately, the system crashes. The rollout from v1 to v2 is gradual
+### DaemonSet
 
 
-The API creates a new replica with v2, if the container passes its liveness check, the system continues to keep that container up and running, but it hasn't been added to the load balancer until the readiness check is passed. at that point, traffic is brought down to this new container.
 
-Now the API tries to delete an old v1 container, but what if that container is receiving traffic or handling user data? With the termination grace period (default: 30s), there is a delay between the order to be deleted until the pod is actually terminated. In this time, the connection to the LB is severed but the container is still running during this period. The user requests being processed by this container are processed, and no new requests come. After 30s, the pod is deleted. Now, the API creates a new v2 pod, liveness check passes, readiness too, a second v1 pod dies, etc.
+## Kubernetes configuration
 
-The deployment process is very configurable, with the amount of pods are inserted at each time.
+You can send config requests (json/yml) to the API server in the cluster. It's a declarative format, number of pods, replicas, container name, image, envs and ports. What you write in this config, is what it should be. Controller manager checks if the actual state == desired state. If not, it makes adjustments.
 
-[Serverless on k8s](https://www.youtube.com/watch?v=xL6lixC4D8Q&list=PLLasX02E8BPCrIhFrc_ZiINhbRkYMKdPT&index=6)
+Parts of configuration file:
 
-## Scheduler
+* apiVersion: apps/v1, v1
+* kind: Deployment, Service
+* metadata
+  * Name
+* spec -> They are specific to the kind of component we're creating
+  * Replicas
+  * Selector
+  * Template
+  * Ports
+* Status is automatically generated and added by k8s, and specifies desired vs. actual state. The actual state info comes fron the ´etcd´
 
-The infrastructure is a bunch of VMs, the k8s API on top of it, and a pod that you want tke k8s API to run. Which VM should it run on?
+Usually config files are stored together with the code.
 
-The scheduler is continually watching for pods that have been created but not scheduled, it also continually watches the state of all the VMs/machines.
+## Minikube and kubectl setup
 
-* Predicates: hard constraints, things that can't be violated. like minimum memory the container needs, or that the container should run on SSD
-* Priorities: softer constraints, it would be nice if my application was spread over many number of failure domains, and so on. These constraints can be violated if necessary.
+In a production setting, we have at least 2 master nodes and several worker nodes.
 
-## Setting up a k8s build pipeline
+Minikube is 1 node cluster where master and worker nodes all run in one node, and it's a tool to test and local cluster setup.
 
-You have your source code in a git repository somewhere. the container registry (CR) (azure, docker) is in the cloud. How to set up that the cluster only pulls images from my registry. with the admissions controller, it's a code that you run that validates every request coming to the cluster. In this case, we validate that the image field has myreg.acc.io/*. Writing the admissions controller can be a bit daunting, so the k8s policy controller that given a policy, it creates the admissions controller.
-
-Now how to get our code into the CR. The build pipeline listens to our source control and builds images, it turns the code into the container image. Take the key from the CR to access it, and this key should only be present in your build pipeline and nowhere else. The keys to create pods in the k8s cluster should also be present in your build env, and nowhere else.
-
-The build process should include code review, unit testing, vulnerability scanning (libraries that may have vulnerabilities), credential scanning (if passwords exist in the code), integration testing, etc.
-
-## Volumes and storage in k8s
-
-A volume is associated to the pod but mounted into a container at a particular path.
-
-Simplest volume: a temporary volume associated with the pod (called empty dir), the lifespan of the volume is associated with the pod itself. Used for caching and temporary information.
-
-Persistent volume: can be mapped to an azuredisk or nfs, iscsi or any other persistent volume types. These disks live longer than the lifespan of the pod. If the pod changes machine, these disks follow it around. 
-
-more videos in the youtube playlist
-
-* stateful applications in k8s
-* Secret management in k8s
-* Configuration management
-* Role based access control
-* Getting production ready
-* Service meshes
-* Simple application management with operators
-* Monitoring and alerting
-* Pods and the pod lifecycle
-* Customizing and extending the k8s API with admission controllers
-
-## EKS workshop
-
-Orchestration: from managing one application to managing a set of applications, important when something has a certain scale.
-
-docker: package apps, k8s: shift apps around, pool servers into a pool of resources. instead of thinking of servers, you start thinking in terms of apps.
-
-with container orchestrators, we describe what it should look like when it's done
-
-EKS is Amazon's k8s service, elastic k8s service. 
-
-we can run k8s in aws, in our data center, and we get the same experience.
-
-Nodes are machines that make up a k8s cluster, they can be physical or virtual.
-
-* Control panel-node type, making up a control plane, the brains of the cluster
-* Worker node type, making up the data plane, the actual container images (via pods)
-
-Object: records of intent, what we expect to see when everything is perfect. Once created the cluster does its best to ensure it exists as defined. The cluster's 'desired state'. A deployment can be an object.
-
-* Pod: a thin wrapper around 1+ containers. When containers should be scaled together, they should all be in one pod. If not, different pods
-* DaemonSet: type of deployment, implements a single instance of a pod on a worker node. for example only worker nodes that have a certain GPU
-* Deployment: details how to roll out (or roll back) across versions of your application
-* ReplicaSet: ensure a defined number of pods are always running
-* Job: ensures a pod properly runs to compilation
-* Service: maps a fixed IP address to a logical group of pods
-* Label: key/value pairs used for association and filtering
-
-## k8s architecture
-
-**kubectl** is a wrapper around the k8s api. The API connects to the data node via a **kubelet**
-
-## eks
-
-eks cluster creation workflow
-
-1. create eks cluster
-    * in eks, just a command
-    * in diy mode, creating up the control node takes more work
-    * create HA control plane
-    * IAM integration
-    * certificate management
-    * setup load balancer
-2. provision worker nodes
-3. launch add-ons
-4. launch workloads
-
-When you create an eks you target a vpc that's in your account
-
-new user workshop, pass nem
-https://361936660388.signin.aws.amazon.com/console
-log in with the account id, but workshop username and password
-
-https://us-west-2.console.aws.amazon.com/cloud9/home/product create environment
-it opens like a vscode inside aws
-
-my cloud9: name eksworkshop or sth https://us-west-2.console.aws.amazon.com/cloud9/ide/7c52aab599df4afb96d53a138fb27582
+Kubectl is a tool to interact with the cluster: create/destroy pods, create services... And it can be used for minikube or cloud cluster
 
 ```bash
-workshop:~/environment $ eksctl delete cluster --name eksworkshop-eksctl
-[ℹ]  eksctl version 0.31.0
-[ℹ]  using region us-west-2
-[ℹ]  deleting EKS cluster "eksworkshop-eksctl"
-[ℹ]  deleted 0 Fargate profile(s)
-[✔]  kubeconfig has been updated
-[ℹ]  cleaning up AWS load balancers created by Kubernetes objects of Kind Service or Ingress
-[ℹ]  2 sequential tasks: { delete nodegroup "nodegroup", delete cluster control plane "eksworkshop-eksctl" [async] }
-[ℹ]  will delete stack "eksctl-eksworkshop-eksctl-nodegroup-nodegroup"
-[ℹ]  waiting for stack "eksctl-eksworkshop-eksctl-nodegroup-nodegroup" to get deleted
-[ℹ]  will delete stack "eksctl-eksworkshop-eksctl-cluster"
-[✔]  all cluster resources were deleted
+minikube start
+minikube status
+kubectl get node
 ```
 
-workshop position: https://www.eksworkshop.com/beginner/050_deploy/
+Demo: setup of a cluster with a webapp and a mongodb. K8s component overview:
 
-backend crystal and nodejs, frontend ruby
+* ConfigMap with the MongoDB endpoint
+* Secret with MongoDB user and password
+* Deployment + Service for MongoDB app with internal service
+* Deployment + Service for webapp with external service
 
-## questions
-
-* last week ecs, today kubernetes. elastic container/kubernetes service
-* the environment in aws is it equivalent to the command line in our computer? or special access?
-
-
-deployment: how it should be deployed, service: how do services in the cluster gain access to this
-
-After running both backend services
-
-```bash
-workshop:~/environment/ecsdemo-crystal (master) $ kubectl get pods
-NAME                               READY   STATUS    RESTARTS   AGE
-ecsdemo-crystal-6d5f6f4b47-6t66n   1/1     Running   0          13s
-ecsdemo-nodejs-7dd8987798-n7zjp    1/1     Running   0          20m
-
-workshop:~/environment/ecsdemo-crystal (master) $ kubectl get services
-NAME              TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
-ecsdemo-crystal   ClusterIP   10.100.102.92    <none>        80/TCP    21s
-ecsdemo-nodejs    ClusterIP   10.100.179.218   <none>        80/TCP    19m
-kubernetes        ClusterIP   10.100.0.1       <none>        443/TCP   34m
+mongo-config.yaml:
+```yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-config
+data:
+  mongo-url: mongo-service
 ```
 
-if we talk to the first IP address from the cluster and on port 80 it will port our traffic into any running pod that this service has, in this case, two. these backend services only get traffic from inside the cluster
+data: mongo-url is the service name of MongoDB
 
-now frontend. this service needs to tak traffic external into the cluster --> it needs ingress.
+mongo-secret.yml
+```yml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-secret
+type: Opaque
+data:
+  mongo-user: bW9uZ291c2Vy
+  mongo-password: bW9uZ29wYXNzd29yZA==
+```
 
-the kubernetes/service.yaml contains type: LoadBalancer: This will configure an ELB to handle incoming traffic to this service. for more sophisticated loadbalancers, we can use ingress
+Deployment + Service all in one file:
 
-service.yaml for frontend. backend is identical but except the LoadBalancer. Backend has the default type, which is ClusterIP: This Exposes the service on a cluster-internal IP. Choosing this value makes the service only reachable from within the cluster
-
-```yaml
+mongo.yml
+```yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-deployment
+  labels:
+    app: mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:5.0
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME # the env name that mongodb expects
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: mongo-user
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: mongo-password
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ecsdemo-frontend
+  name: mongo-service
 spec:
   selector:
-    app: ecsdemo-frontend
-  type: LoadBalancer
+    app: mongo
   ports:
-   -  protocol: TCP
-      port: 80
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017
+```
+
+The template is the configuration for the Pod, it has its own "metadata" and "spec" section.
+containers: image is the name of the Docker Image we will be using from the Hub.
+labels:app is the name of the app which we can choose what we want, so that all Pods have the common name (even though they all have a unique identifier)
+selector:matchLabels identifies a set of resources, and selects which Pods belong to Deployment. In this case, all Pods that match the name `mongo` belong to this deployment.
+`---` is a yaml separator, after that we have the service.
+
+The requests will access the Mongo service `port` which is 27017. This service will call the `targetPort`, which port to forward the request to the Pods, which is 27017, which has to match the `containerPort`. It's common practice to have all the same ports for everything.
+
+webapp.yml
+```yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-deployment
+  labels:
+    app: webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+    spec:
+      containers:
+      - name: webapp
+        image: nanajanashia/k8s-demo-app:v1.0
+        ports:
+        - containerPort: 3000
+        env:
+        - name: USER_NAME
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: mongo-user
+        - name: USER_PWD
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: mongo-password
+        - name: DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mongo-config
+              key: mongo-url
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-service
+spec:
+  type: NodePort # this makes the service external
+  selector:
+    app: webapp
+  ports:
+    - protocol: TCP
+      port: 3000
       targetPort: 3000
+      nodePort: 30100 # NodePort type requires a nodePort, and it has to be in a range. exposes the Service on each Node's IP at static port -> <NodeIP>:<NodePort>
 ```
 
-to deploy it
+To apply, in order:
 
 ```bash
-cd ~/environment/ecsdemo-frontend
-kubectl apply -f kubernetes/deployment.yaml
-kubectl apply -f kubernetes/service.yaml
-kubectl get deployment ecsdemo-frontend
+kubectl apply -f mongo-config.yml
+kubectl apply -f mongo-secret.yml
+kubectl apply -f mongo.yml
+kubectl apply -f webapp.yml
 ```
 
-to scale to 3 replicas
+
+To interact with cluster:
 
 ```bash
-kubectl scale deployment ecsdemo-crystal --replicas=3
+kubectl get all
+kubectl get configmap
+kubectl get secret
+kubectl describe pod POD_NAME
+kubectl logs POD_NAME
 ```
-
-
-
-https://www.eksworkshop.com/beginner/070_healthchecks/
-
-
-### Hackathon
-
-not good to create a cluster with a user, because then the user can't be removed. if the user is removed, cluster is lost. so one way to do it is creating roles and assigning this role to the cluster, even if the user is removed, the cluster can be accessed
-
-1. assume role
-2. create cluster
-
-every time you want to access cluster, run command aws sts assume-role bla bla
-save aws_Access_key_id, aws_secret_Access_key, aws_session_token in env variables, restart terminal/vscode.
-whenever you assume the role, these 3 variables will change. you need to update them
-
-ekstcl command to create cluster with the role, according to the cluster policy `cluster.yaml` with the vpc id. this config is used to eksctl to create the cloudformation to create the cluster.
-
-load balancer in public subnet, workers in private subnet. and priv+pub x2 to ensure high availability
-
-
-assume role
-
-```bash
-aws sts assume-role --role-arn "arn:aws:iam::529376911423:role hackathon-eks-role" --role-session-name AWSCLI-Session
-```
-
-update env variables with these new variables access_id, secret_access_key, session_token to the role's.
-
-the way we did it, I overrule the user credentials in Users/aberasategi/.aws/credentials, so now I 'lost' my user.
-
-```bash
-aws eks update-kubeconfig --name hackaton-eksctl-team --region us-east-2
-kubectl cluster-info
-```
-
-cluster autoscaler when there's more demand, it communicates with aws autoscaler. tags of the aws autoscaler aren't complete
-
-
-kubectl get all -n default
-kubectl -n kube-system logs -f deployment.apps/cluster-autoscaler
-kubectl apply -f Desktop/nginx.yaml
-kubectl delete deployment cluster-autoscaler -n kube-system
-
-https://docs.aws.amazon.com/eks/latest/userguide/cluster-autoscaler.html
-https://aws.amazon.com/premiumsupport/knowledge-center/eks-cluster-autoscaler-setup/
-https://docs.aws.amazon.com/eks/latest/userguide/dashboard-tutorial.html
-
-aws sts assume-role --role-arn "arn:aws:iam::123456789012:role/example-role" --role-session-name AWSCLI-Session
-
-kubectl get pods --all-namespaces
-
-eksctl to create, delete, kubectl to manage
