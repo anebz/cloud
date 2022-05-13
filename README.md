@@ -22,6 +22,10 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 3. 🔷🔷 Azure DP-100 Data Scientist Associate: [Markdown notes](Certifications/az_dp_100.md) | [PDF version](Certifications/az_dp_100.pdf)
 4. 🔷🔷 Azure AI-102 AI Engineer Associate: [Markdown notes](Certifications/az_ai_102.md) | [PDF version](Certifications/az_ai_102.pdf)
 
+## GCP Certifications
+
+1. 🔻 GCP digital leader: [Markdown notes](Certifications/gcp_digital_leader.md) | [PDF version](Certifications/gcp_digital_leader.pdf)
+
 ## Practice projects
 
 * ⭐️ [AWS Hands On tutorials](https://aws.amazon.com/getting-started/hands-on/)
