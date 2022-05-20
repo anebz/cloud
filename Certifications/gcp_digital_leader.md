@@ -3,6 +3,7 @@
 Notes obtained from [tutorialsdojo cheatsheets](https://tutorialsdojo.com/google-cloud-platform-gcp-cheat-sheets/)
 
 - [Google Cloud Digital Leader certification](#google-cloud-digital-leader-certification)
+  - [Google official training](#google-official-training)
   - [Compute](#compute)
     - [Google compute engine (GCE)](#google-compute-engine-gce)
     - [Google App Engine](#google-app-engine)
@@ -46,7 +47,6 @@ Notes obtained from [tutorialsdojo cheatsheets](https://tutorialsdojo.com/google
     - [Source repositories](#source-repositories)
     - [Container registry](#container-registry)
     - [Build](#build)
-  - [Google official training](#google-official-training)
 
 Any Google cloud resources that you allocate and provision must belong to a project. A project is composed of settings, permissions, and other metadata that describe your applications. Resources within a single project can work together straightforward by communicating through an internal network, subject to region-and-zone rules. A project can’t access another project’s resources unless configured to do so using Shared VPC or VPC Network Peering.
 
@@ -63,6 +63,76 @@ The cloud infrastructure of GCP is built around:
 * 140+ network edge locations
 
 In GCP, a project is linked to a Cloud Billing Account that enables customers to connect a Payments Profile that includes a payment instrument to which costs are charged and pay for resource usage.
+
+## [Google official training](https://cloud.google.com/training/business#cloud-digital-leader-path)
+
+Focus areas for culture transformation
+
+* Empowerment
+* Environment
+* Innovation
+* Structure
+* Strategy
+* Talent
+
+Principles to scale innovation mindset
+
+* Access
+  * Fast and easy access
+* Engagement
+  * Valued up-to-date content
+* Customization
+  * Product adapts to individual needs and preferences
+* Communication
+  * Users want to communicate with services
+
+To ensure transformational outcomes: focus on the user, think 10x, launch and iterate
+
+10x mindset: fundamentally rethink business problems and solutions by a factor of 10.
+
+* Data lake is a repository of raw data and tend to hold backup data
+* Databases efficiently ingest large amounts of real-time data
+* Data warehouses rapidly analyze multi-dimensional datasets
+
+High-quality, bug-free data has: coverage, cleanliness, completeness (The availability of sufficient data about the world to replace human knowledge).
+
+> Migration
+
+When migrating to cloud, IT maintenance work is outsorced to the cloud provider.
+
+* Move, then change
+  * Conservative approach
+* Change, then move
+  * More aggressive, make apps cloud-ready while they're on premises, then move
+* Invent in greenfield
+  * Build an entirely new infra and apps in the cloud
+  * Build apps at the same time as infra
+  * Requires agility, access to a diverse development skillset and strong support from leadership
+* Invent in brownfield
+  * Invent new app in cloud that will replace an existing legacy app that remains on premises, and is retired only after the new app is built
+  * Adds redundancy, minimizes risk, increased costs
+* Move without changes
+
+> Costs
+
+Best practices for managing cloud costs:
+
+* Visibility
+  * Visualize current spending, trends, forecasting
+* Accountability
+  * You can allocate costs to individual departments and teams
+  * Accountablity culture
+* Control
+  * Control who has the ability to spend and view costs
+* Intelligence
+  * Google cloud makes intelligent recommendations
+
+Google's data security design consists of:
+
+* Sharding data
+* Encrypting each piece of data
+* Encryption the data encryption key
+
 
 ## Compute
 
@@ -333,72 +403,3 @@ Container image repository to manage Docker images, perform vulnerability analys
 ### Build
 
 Build, test and deploy on GCP's serverless CICD platform. Fully serverless platform that helps you build your custom development workflows for building, testing, and deploying.
-
-## [Google official training](https://cloud.google.com/training/business#cloud-digital-leader-path)
-
-Focus areas for culture transformation
-
-* Talent
-* Environment
-* Structure
-* Strategy
-* Empowerment
-* Innovation
-
-Principles to scale innovation mindset
-
-* Access
-  * Fast and easy access
-* Engagement
-  * Valued up-to-date content
-* Customization
-  * Product adapts to individual needs and preferences
-* Communication
-  * Users want to communicate with services
-
-To ensure transformational outcomes: focus on the user, think 10x, launch and iterate
-
-10x mindset: fundamentally rethink business problems and solutions by a factor of 10.
-
-* Data lake is a repository of raw data and tend to hold backup data
-* Databases efficiently ingest large amounts of real-time data
-* Data warehouses rapidly analyze multi-dimensional datasets
-
-High-quality, bug-free data has: coverage, cleanliness, completeness (The availability of sufficient data about the world to replace human knowledge).
-
-> Migration
-
-When migrating to cloud, IT maintenance work is outsorced to the cloud provider.
-
-* Move, then change
-  * Conservative approach
-* Change, then move
-  * More aggressive, make apps cloud-ready while they're on premises, then move
-* Invent in greenfield
-  * Build an entirely new infra and apps in the cloud
-  * Build apps at the same time as infra
-  * Requires agility, access to a diverse development skillset and strong support from leadership
-* Invent in brownfield
-  * Invent new app in cloud that will replace an existing legacy app that remains on premises, and is retired only after the new app is built
-  * Adds redundancy, minimizes risk, increased costs
-* Move without changes
-
-> Costs
-
-Best practices for managing cloud costs:
-
-* Visibility
-  * Visualize current spending, trends, forecasting
-* Accountability
-  * You can allocate costs to individual departments and teams
-  * Accountablity culture
-* Control
-  * Control who has the ability to spend and view costs
-* Intelligence
-  * Google cloud makes intelligent recommendations
-
-Google's data security design consists of:
-
-* Sharding data
-* Encrypting each piece of data
-* Encryption the data encryption key
