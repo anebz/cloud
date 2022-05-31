@@ -751,3 +751,23 @@ training_step = TrainingStep(
 ```
 
 ## [Course 3: Optimize ML Models and Deploy Human-in-the-Loop Pipelines](https://www.coursera.org/learn/ml-models-human-in-the-loop-pipelines?specialization=practical-data-science)
+
+### Deployment strategies
+
+* Blue/Green
+  * Create deployment, get it working, then swap prediction request traffic. Easy to rollback
+* Shadow/Challenger
+  * Parallel prediction request traffic, validate new version without impact
+  * Traffic goes to both endpoints at the same time, the new version captures the results but doesn't server them to the user. The user gets their result from old version
+* Canary
+  * Split traffic, target smaller specific users for the new version, shorter validation cycles, minimize risk of low performing model
+* A/B
+  * Split traffic, target larger users for the new version, longer validation cycles, minimize risk of low performing model
+  * Gather live data about new models
+  * Usually run for longer times than canary tests
+* Multi-armed bandits
+  * The only dynamic approach in the list, use RL to automatically decide when and how to distribute traffic
+  * Exploit & explore
+    * Exploit: reward the winning model with more traffic
+    * Explore: continue to send traffic to the non-winning model/s in case behavior changes
+
