@@ -37,11 +37,18 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 * ⭐️ [AWS: serverless data processing](https://www.eventbox.dev/published/lesson/emea-streaming-analytics/)
 * ⭐️ [AWS: cloud resume challenge](https://cloudresumechallenge.dev/docs/the-challenge/aws/)
   * Contains: S3, CloudFront, Route 53, ACM, DynamoDB, Lambda, API Gateway, AWS SAM and Github Actions
+* ⭐️ [AWS: certification courses and practice labs](https://learn.cantrill.io/courses)
+* ⭐️ [AWS: social media dashboard, serverless](https://aws.hashnode.com/how-to-build-a-minimalistic-zero-cost-lambda-powered-social-media-dashboard)
+* ⭐️ [AWS: serverless audio blogs with lambda, sqs, polly](https://engineering.hashnode.com/how-we-build-serverless-audio-blogs-with-aws-on-a-scale)
+* ⭐️ [AWS: serverless chatbot with Amplify and Lex](https://sandro.volpee.de/how-to-develop-a-serverless-chatbot-with-aws-amplify-amazon-lex-and-react)
+* ⭐️ [AWS: serverless post backup, api, sqs, lambda, async api, websockets](https://engineering.hashnode.com/serverless-github-backups)
+* ⭐️ [AWS: Deploying a FastAPI Application to Elastic Beanstalk](https://testdriven.io/blog/fastapi-elastic-beanstalk/)
 * 🔷 [Azure: cloud resume challenge](https://cloudresumechallenge.dev/docs/the-challenge/azure/)
   * Contains: Azure Storage, CDN, Azure DNS, CosmosDB, Azure API, Functions, ARM and Github Actions
 * 🔷 [Azure Citadel: hands-on tutorials](https://www.azurecitadel.com/)
 * 🔷 [Azure networking labs](https://github.com/binals/azurenetworking)
 * 🔷 [Azure project: build a pet store](https://chtrembl.github.io/azure-cloud/petstore/)
+* 🔷 [Azure: cloud resume challenge](https://www.youtube.com/watch?v=ieYrBWmkfno)
   * Contains: Azure DevOps, Functions, Kubernetes
 * 🔻 [GCP: cloud resume challenge](https://cloudresumechallenge.dev/docs/the-challenge/googlecloud/)
   * Contains: Google Cloud Storage, Cloud CDN, Cloud Domains, Firestore, API, Google Cloud Functions, Terraform and Cloud Build
