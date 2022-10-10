@@ -126,7 +126,7 @@ To list files in DBFS within a notebook: `%fs ls /my-file-path`.
 
 Web-based notebook for data exploration, visualization, sharing and collaboration features to Spark. It runs on HDInsight Spark clusters. The notebook runs Spark jobs.
 
-1. Create HDInsight Spark cluster to include Spark MLib library
+1. Create HDInsight Spark cluster to include Spark MLlib library
 2. Install Microsoft ML for Spark
 3. Create and execute Zeppelin notebooks on cluster
 4. When cluster is ready, export notebooks to local

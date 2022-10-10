@@ -14,6 +14,7 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 2. ⭐️ AWS certified cloud practitioner: [Markdown notes](Certifications/aws_cloud_practitioner.md) | [PDF version](Certifications/aws_cloud_practitioner.pdf)
 3. ⭐️⭐️ AWS developer Associate: [Markdown notes](Certifications/aws_developer_associate.md) | [PDF version](Certifications/aws_developer_associate.pdf)
 4. ⭐️⭐️ AWS solutions Associate: [Markdown notes](Certifications/aws_solutions_associate.md) | [PDF version](Certifications/aws_solutions_associate.pdf)
+5. ⭐️⭐️⭐️ AWS data analytics specialty: [Markdown notes](Certifications/aws_data_anaytics_specialty.md) | [PDF version](Certifications/aws_data_anaytics_specialty.pdf)
 
 ## Azure certifications
 
@@ -99,34 +100,3 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
   * Migrate endpoint from HTTP to HTTPS (page 139)
   * Network security: NAT, ASGs (page 159)
 * ❗️❗️ [The Cloud Resume Challenge](https://cloudresumechallenge.dev/)
-
-## Cheatsheet
-
-Access an EC2 instance from bash
-
-```bash
-chmod 400 mynvkp.pem
-ssh ec2-user@public-ipv4-address -i mynvkp.pem
-```
-
-Configure AWS profile
-```bash
-aws configure --profile 'newprofile'
-# insert user's data
-
-nano ~/.aws/credentials
-nano ~/.aws/config
-# check that info and profile name has been stored correctly
-
-export AWS_PROFILE=newprofile
-# start using your profile
-
-aws iam get-user
-# should return your Username, UserId, and ARN
-```
-
-```python
-import boto3
-session = boto3.Session(profile_name='shotty')
-ec2 = session.resource('ec2')
-```
