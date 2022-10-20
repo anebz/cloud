@@ -38,6 +38,7 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 * ⭐️ [AWS: serverless data processing](https://www.eventbox.dev/published/lesson/emea-streaming-analytics/)
 * ⭐️ [AWS: cloud resume challenge](https://cloudresumechallenge.dev/docs/the-challenge/aws/)
   * Contains: S3, CloudFront, Route 53, ACM, DynamoDB, Lambda, API Gateway, AWS SAM and Github Actions
+* ⭐️ [AWS DynamoDB labs](https://amazon-dynamodb-labs.com/index.html)
 * ⭐️ [AWS: certification courses and practice labs](https://learn.cantrill.io/courses)
 * ⭐️ [AWS: social media dashboard, serverless](https://aws.hashnode.com/how-to-build-a-minimalistic-zero-cost-lambda-powered-social-media-dashboard)
 * ⭐️ [AWS: serverless audio blogs with lambda, sqs, polly](https://engineering.hashnode.com/how-we-build-serverless-audio-blogs-with-aws-on-a-scale)

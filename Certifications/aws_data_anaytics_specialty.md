@@ -1,5 +1,6 @@
 # AWS Data Analytics Specialty
 
+* [AWS practical workshops](https://workshops.aws/)
 * [AWS Partner practice exams](https://explore.skillbuilder.aws/learn/course/12472/aws-certified-data-analytics-specialty-official-practice-question-set-das-c01-english)
 * [Official AWS exam guide](https://d1.awsstatic.com/training-and-certification/docs-data-analytics-specialty/AWS-Certified-Data-Analytics-Specialty_Exam-Guide.pdf)
 * [Official AWS exam sample questions](https://d1.awsstatic.com/training-and-certification/docs-data-analytics-specialty/AWS-Certified-Data-Analytics-Specialty_Sample-Questions.pdf)
@@ -7,7 +8,11 @@
 * [Tutorialsdojo exam study path](https://tutorialsdojo.com/aws-certified-data-analytics-specialty-exam-guide-study-path-das-c01-das-c02/) #TODO
 
 - [AWS Data Analytics Specialty](#aws-data-analytics-specialty)
-  - [Data migration to AWS](#data-migration-to-aws)
+  - [1. Data collection](#1-data-collection)
+  - [2. Storage](#2-storage)
+    - [2.1. S3](#21-s3)
+  - [DynamoDB](#dynamodb)
+    - [Data migration to AWS](#data-migration-to-aws)
   - [Kinesis](#kinesis)
     - [Data stream](#data-stream)
     - [Firehose lab](#firehose-lab)
@@ -18,12 +23,138 @@
   - [MSK](#msk)
   - [Data pipeline](#data-pipeline)
   - [IoT](#iot)
-  - [Dynamo DB](#dynamo-db)
-    - [query vs. scan](#query-vs-scan)
+  - [athena](#athena)
+  - [Glue](#glue)
+  - [lake formation](#lake-formation)
+  - [EMR](#emr)
+  - [Redshift](#redshift)
 
 ![ ](img/aws_data_analytics_specialty/data_lake_warehouse.jpg)
 
-## Data migration to AWS
+To compress json data in s3, use parquet or ORC format. max recommended file size for parquet is 250MB. merging small parquet files into one big parquet file improved performance, because you only open the file once. good practice to have less, bigger parquet files.
+
+## 1. Data collection
+
+## 2. Storage
+
+### 2.1. S3
+
+* S3 latency is between 100-200ms
+* Min. 3.5k put/copy/post/delete
+* 5.5k get/head requests per second per prefix per bucket
+
+Prefix is the object path in s3, so we get that performance per folder
+
+With access points, create one access point per prefix, and grant access to different IAM groups to different prefixes in S3
+
+With S3 object Lambda, you can change the objects before it's retrieved by the caller application, without creating another object. for that, we need 1 bucket, an access point and an object lambda access point.
+
+S3 now has strongly consistency for all operations
+
+## DynamoDB
+
+* provisioned capacity: specify rcu and wcu, the throughput for reads and writes. if you go over, you can access a temporary burst capacity, but if you exceed that, you will get error "ProvisionedThroughputExceededException"
+  * Burst capacity only lasts for 300s
+  * This error can come from exceeding provisioned rcu and wcu, or because of hot keys (one partition key being read too many times, for popular items), hot partitions, or very large items
+  * To fix: exponential backoff, distribute partition keys and if rcu is an issue, use DAX
+* on-demand: automatic scaling, no capacity planning needed
+* you can switch between the modes every 24h
+
+Each partition key is limited to 10GB of data, 3k RCU and 1k WCU
+
+* 1 wcu = 1 write/s for an item up to 1kb. for larger files, more wcu
+  * ex: write 10 items/s with item size 2kb: 10 * (2kb/1kb) = 20wcu
+  * ex: write 6 items/s with item size 4.5kb: ~~6 * (4.5/1) = 27wcu~~ 4.5kb gets rounded to 5, so 6*5 = 30wcu
+  * ex: write 120items/min with item size 2kb: 120/60 = 2items/s * 2 = 4wcu
+
+for reading, 2 options: strongly(2x rcu) and eventually consistency. For consistent, for every API call, we set the ConsistentRead parameter
+
+* 1 rcu = 1 strongly consistent reads/s = 2 eventually consistent read/s for an item up to 4kb
+  * ex: 10 strong reads/s, item size 4kb: 10rcu
+  * ex: 16 eventual reads/s, item size 12kb: 16/2 * 12/4 = 8*3 = 24rcu
+  * ex: 10 strong reads/s, item size 6kb: ~~10 * 6/4 = 10 * 0.66 = 10rcu~~ 6 gets rounded to next multiplier of 4, which is 8, so 10 * 8/4 = 20rcu
+
+> Read operations
+
+* GetItem returns eventual reads by default, you can use projection expression to retrieve only certain attributes.
+* Query returns items based on a specific partition key
+  * KeyConditionExpression, partition key and sort key
+  * FilterExpression: additional filtering after the query operation (before data is returned to you). use only with non-key attributes (no hash or range attributes)
+  * Returns: number of items specified on limit, or up to 1MB of data. Can paginate results
+  * What can get queried? A table, a LSI or GSI
+* Scan
+  * Scan entire table and then filter out
+  * Returns up to 1MB of data, use pagination to keep reading
+  * Consumes a lot of RCU
+  * For faster performance, use Parallel scan
+
+Batch operations allow to save in latency by reducing number of API calls, operations done in parallel.
+
+* BatchWriteItem:
+  * up to 25 PutItem/DeleteItem per call
+  * up to 16MB of data written
+  * up to 400KB data per item
+  * But not useful for update items, for that do it individually
+* BatchGetItem
+  * Returns items from one table or from more
+  * Up to 100 items
+  * Up to 16MB of data
+  * Items are retrieved in parallel
+
+A transaction is an operation to update multiple values at the same time. If one should fail, all should fail. All or nothing.
+
+> LSI
+
+* Alternative sort key, but must keep the same partition key as that of base table -> PK must be composite
+* Up to 5 LSI per table
+* Must be defined on table creation time
+
+> GSI
+
+* Alternative primary key from the base table (hash or hash+range)
+  * PK can be simple or composite
+* Used to speed up queries on non-key attributes
+* Can be added/modified after table creation
+* Must provision rcu and wcu for each index
+
+**If writes are throttled in GSI, the main table will be throttled as well**
+
+If we have a table with Users, their comments and the date. Each comment has an ID, which is the primary key. sort key is the date. if we want to find comments made by a user, we can either scan the whole table, or create a gsi with the username as partition key and date as sort key. after we have that, we can query on the gsi, by specifying the gsi name on the --index-name.
+
+> DAX
+
+* Fully managed, highly available in-memory cache for DynamoDB
+* Microsecond latency for reads and queries
+* solves the hot key problem
+* 5min TTL for cache by default
+* up to 10 nodes per cluster
+* 3 nodes minimum in production, multi-az
+
+dax vs. elasticache
+
+* dax has individual objects cache for querys and scans
+* elasticache stores aggregation results
+
+> backup
+
+* on demand: backups remain forever, even after table is deleted
+  *  create full backups of your tables for long-term retention and archival for regulatory compliance needs.
+* point in time recovery
+  * helps to protect your DynamoDB tables from accidental write or delete operations
+  * you can restore that table to any point in time during the last 35 days
+  * rolling windows way, backup stays for 35 days
+  * You can restore the table to the same AWS Region or to a different Region from where the backup resides. You can also exclude secondary indexes from being created on the new restored table. In addition, you can specify a different encryption mode.
+
+if you want more control over backups, aws backups offers centralization, data protection and backup management, monitoring status of backups, verifying compliance. with aws backup we can create daily backups and store them for a month.
+
+* Backup vault: a container that you organize your backups in. when creating a vault, a kms key is automatically created
+* Backup plan: a policy expression that defines when and how you want to back up your AWS resources. The backup plan is attached to a backup vault.
+* Resource assignment: defines which resources should be backed up. You can select resources by tags or by resource ARN.
+* Recovery point: a snapshot/backup of a resource backed up by AWS Backup. Each recovery point can be restored with AWS Backup.
+
+More in-depth information about DynamoDB in the [DynamoDB Lab](https://amazon-dynamodb-labs.com/hands-on-labs.html)
+
+### Data migration to AWS
 
 * Storage gateway: hybrid storage that connects on-prem to AWS. ideal for backup, bursting, tiering, migration
 * Kinesis firehose: capture, transform and load streaming data into s3 for use with business intelligence and analytics tools
@@ -39,6 +170,8 @@
   * Snowmobile: for huge data transfers,they send a truck instead of a box
 
 ## Kinesis
+
+* [Datalake workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/c5661636-bfc3-4771-be38-a4072661bfda/en-US)
 
 Streaming service:
 
@@ -65,6 +198,7 @@ Stream workflow:
 3. Process stream
 4. Send to final storage
   * S3: buffer size range is from 1MB to 128MB. buffer interval is from 60s to 90s. firehose can raise buffer size dynamically. data delivery failures, auto retries up to 24h
+    * By default, firehose-s3 default prefix is already based on year,months,day,hour. if we have many devices, we want to use custom prefix based on device and date (in our example, once a day)
   * Elasticsearch: same as for s3. custom retry duration up to 7200s, moves skipped files to s3 and provides a manifest file for manual entry
   * Redshift, depends on redshift to finish the COPY command. firehose issues a new copy command automatically. for data delivery failures, same as elasticsearch
 
@@ -196,6 +330,8 @@ Data retention is 3 days default, max 14 days. Low latency, <10ms on publich and
 
 ## MSK
 
+* [Kinesis & Kafka for fraud detection workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/ad026e95-37fd-4605-a327-b585a53b1300/en-US)
+
 Managed Streaming for Apache Kafka is a service that uses fully managed Apache Kafka to ingest and process streaming data in real time. It's an alternative to kinesis, default message size is 1MB but it can be configured to send larger messages, like 10MB. 
 
 The MSK cluster is composed of keeper and broker, broker is where you keep partitions. in kinesis stream we have streams and shards, in kafka we have topics and partitions.
@@ -270,112 +406,243 @@ If a task is not completed successfully, Data Pipeline retries the task accordin
 
 #TODO add more info
 
-## Dynamo DB
+## athena
 
-* 1 read request unit = 1 strongly consistent read request, or 2 eventually consistent read requests, for an item up to 4KB in size. The total number of read request units required depends on the item size, and whether you want an eventually consistent or strongly consistent read
-* One write request unit represents one write for an item up to 1KB in size.
+serverless, used for querying the data
 
----
+can't read from glacier
 
-* Eventually consistent: response might not reflect the results of a recently completed write operation. response might include some stale data
-* Strongly consistent: returns a response with the most up-to-date data
-  * might not be available if there's a network delay or outage
-  * may have higher latency
-  * not supported on global secondary indexes
-  * uses more throughput capacity
+Athena workgroups are used to isolate queries for teams, apps or different workloads. you can create separate workgroups for different eams, and give different permissions, enforce cost constraints. you can track query-related metrics for all workgroup queries. IAM groups cannot manage the isolation of queries and tracking query history for teams
 
-partitions
+Athena suport susing ODBC and JDBC drivers, allowing you to report and visualize all data in s3 with the tools of your choice
 
-automatically stores data in partitions. a partition is an allocation of storage for a table backed by SSDs and automatically replicated across multiple AZ.
-dynamodb is optimized for uniform distribution of items across a table's partitions, no matter how many partitions there may be.
+athena allows you to set two types of cost contorls: per-query limit and per-workgroup limit. works with SNS
 
-Limits: 10GB data (if lsi, otherwise no limit), 3000 RCU and 1000WCU.
+## Glue
 
-number of partitions is a function of size and performance.
+* [Glue studio workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/71b5bdcf-7eb1-4549-b851-66adc860cd04/en-US)
+* [Glue workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/aaaabcab-5e1e-4bff-b604-781a804763e1/en-US)
 
-partition key for example is animalType, then it creates a hash and with it creates a partition key.
+Glue ETL is for compressing, partitioning, transforming raw data into columnar (more efficient than row-based) data format.
 
-we can have primary key and sort key
+**Serverless** discovery and definition of table definitions and schema. Central metadata repository for your datalake. Discover schemas from your unstructured data and publsish table definitions.
 
-secondary index is a data structure that contains a subset of attributes from a table, it allows efficient access to data with attributes other than the primary key. every secondary index is associated with exactly one table, from which it obtains its data. Secondary index is automatically maintained by dynamodb
+Goal: extract structure from unstructured data.
 
-two types:
+* S3 data lakes
+* RDS
+* Redshift
+* Most other SQL databases
 
-* global secondary index
-* local secondary index
+You can create custom ETL jobs (use Spark under the hood, but you don't need to manage it): trigger-driven, on a schedule, on demand...
 
-main difference is that for lsi, the primary key of the lsi must be composite (partition key and sort key), and for gsi it can be simple or composite
+Gloue crawler scans data in S3 and creates schema. It can run periodically. It populates the glue data catalog, stores only the table definition. once catalogued, you can treat your unstructured data as if it was structured. Using Quicksight, we can visualize data.
 
-sort key uses two attributes together to uniquely identify an item. within unordered hash index, data is arranged by the sort key. no limit on the number of items per partition key, except if you have local secondary index
+Glue crawler extracts partitions based on how the S3 data is organized. e.g. if you have sensor data from devices every hour, you can a) query primarily by time range? then organize your buckets as yyyy/mm/dd/device. b) you can query primarily by device, then organize bucket as device/yyy/...
 
-TODO understand lsi vs. gsi
+Glue crawler can be used for glue data catalog or Hive metastore, not for DynamoDB, not for RDS.
 
-if we put animaltype as partition key and we have a lot of dogs, all dogs end up in one partition -> hot partition. data should be mapped into all partitions.
+Hive lets you run sql-like queries from EMR. the glue data catalog can serve as a Hive "metastore", and also conversely, you can also import a hive metastore into glue.
 
-number of partitions is the maximum between size and performance.
+Glue ETL automatically generates code to transform data, in Scala or python. can be encrypted at rest or in transit. It can be event driven (by glue triggers) or ran in schedule with glue Scheduler.
 
-if our size is 100GB and we want to have 10GB in each partition (which is the maximum we can have), we can have 10 partitions
-performance = ceiling (desired_RCU/3000 + desired_WCU/1000). for 10GB, we want an RCU of 10k and WCU of 3k. so performance = ceiling(10k/3k + 3k/1k) = ceiling(3.3 + 3) = ceiling(6.3) = 7
-number of partitions = max(10, 7) = 10
+It can provision additional DPUs (data processing unit) to increase performance of underlying spark jobs. you can enable job metrics to know the max. capacity in DPUs that you need
 
-allocated reads and writes are distributed to all partitions.
+Glue ETL can: transform, clean, enrich data before doing analysis. It generated code in python/scala, and you can modify the code to tune it to your usecases. You can also provide your own code in Spark or PySpark scripts.
 
-* key selection is critical
-  * many distinct values (aitio guid, randomize)
-  * uniform write pattern across partition keys
-  * uniform temporal write pattern across keys
-  *  don't mix hot and cold keys within a table, create a new table
-* Each partition key is limited to:
-  * 10GB of data, 3k RCU and 1k WCU
+Target of Glue ETL can be S3, RDS, Redshift or Glue data catalog.
 
-performance by indices
+Glue ETL is fully managed, cost effective, pay only what you use. Jobs are run on a serverless Spark platform.
 
-* large number:
-  * as compared to your wcu/rcu allocations
-  * example: thousands of iot devices sending millions of requests
-  * then you need autoscaling
-* for reads:
-  * gsi-s have their own rcu and wcu values
-  * they use alternative keys
-  * keep all the key selection best practices in mind
-  * use caching with dax, elasticache, cloudfront etc
-* for writes:
-  * large number of unique keys
-  * space out in time to avoid maxing out wcu
-  * use SQS queue
-* alternatives:
-  * use burst capacity but this is 300s only, not a recommended approach
-  * auto scaling, but should not be used to cover up bad key selection
+DynamicFrame is a collection of DynamicRecords, which are self-describing records with a schema. It's like a Spark DF but with more ETL stuff.
 
-try to not have a few random large requests or large scan operations. better is to have frequent requests in bursts, and even better is to have even distribution of requests and size.
-
-### query vs. scan
-
-scan is for the whole table or secondary index, it filters out values to prpovide the results you want. A scan operation performs eventually consistent reads by default, and it can return up to 1MB (one page) of data
-
-A single scan request can consume (1MB page size / 4KB item size) / 2 (eventuall consistent reads) = 128 read operations. If you want strongly consistent reads, the scan operation would consume twice as much provisioned throughput: 256 read operations.
-
-techniques to reduce scanning is to use Limit, or create smaller tables.
-
-use parallel scans, multiple threads scanning in parallel, but can quickly consume all of your table's provisioned read capacity. 
-
-query find sitems based on primary key values, you can query by partition key and the sort key
-  * you must specify the partition key name and value as an equality condition
-  * for sort key, you can use equality, less than, greater than, between and begins_with
-
-a query operation can retrieve max 1MB data, and you can have non-unique data for your partition key.
-
-query operations can consume read capacity units but they are the fastest and most efficient way to read data.
-dynamodb calculates the number of read capacity units consumed based on **item size**, not on the amount of data returned to an app. for that, the #capacity units consumed is the same whether you request all the attributes (default) or just some, using a projection expression.
+* Bundled operations: DropFields, DropNullFields to drop (null) fields, Filter (filter records, extract one part of data), Join, Map (add, delete fields),
+* ML transformations: FindMatchesML: identify duplicate or matching records in your dataset, even when the records don't have a common identifier and no fields match exactly
+* Automatic format conversions: csv, json, avro, parquet, orc, xml
+* Anything Spark can do, Glue ETL can do, e.g. k-means
+* ResolveChoice: deals with ambiguities in a DynamicFrame and returns a new one. for example, two fields in the DF with the same name
+  * make_cols: creates a new column for each type, e.g. price_double (100), price_string("100")
+  * cast: casts all vals to a specified type
+  * make_struct: creates a structure that contains each data type
+  * project: projects every type to a given type, for example project:string
 
 ---
 
-adaptive capacity is enabled bad default, saves bad design from throttling and you should use this as a feedback to fix table design.
+To do modifications on the data catalog, only works if DC is in s3, in format json/csv/parquet/avro. if parquet, special code required. and nested schemas are not supported
 
-dynamodb streams, you can create a new record whenever a new item is created, and you can send it to lambda, or sns.
+* To update table schema, a) re-ruwn the crawler or use enableUpdateCatalog/updateBehavior from the script
+* To add new partitions, a) re-run the crawler or use enableUpdateCatalog and partitionKeys options
+* To create new tables, enableUpdateCatalog/updateBehavior with setCatalogInfo enabled
 
 ---
 
-s3
+Glue development endpoints
 
-add info from other notes
+you can develop ETL script in a notebook, create a ETL job from it using spark and glue, and create an endpoint in a VPC. To access it:
+
+* Apache Zeppelin on local machine
+* Zeppelin ontebook on ec2 (via glue console)
+* Sagemaker notebook
+* Terminal
+* PyCharm professional edition
+* Elastic IPs to access a private endpoint address
+
+Job bookmarks persist state from the job run, and prevents reprocessing of old data. Only process new data when re-running on a schedule. Works with S3 and relational db-s via JDBC if primary keys are in sequential order, and only if data is coming as new rows, not as updating rows.
+
+CloudWatch events: fire a Lambda/SNS notification when ETL succeeds or fails. Invoke EC2 run, send event to Kinesis, activate step function etc.
+
+> Costs
+
+Billed by the second for crawler and ETL jobs. First 1M objects stored and accessed are free for the glue data catalog. development endpoints for developing ETL code, like notebooks, charged by the minute.
+
+> Anti-patterns
+
+To use other ETL engines apart from Spark, like Hive, Pig, etc. use Data Pipeline EMR, not Glue
+
+---
+
+Glue ETL supports serverless streaming ETL, it can consume from kinesis or kafka, clean and transform in-flight, and store results in S3 or elsewhere. It runs on spark structured streaming.
+
+Glue studio is a visual interface for ETL workflows. you can create DAGs for complex workflows to transform/sample/join data, to consume from s3/kinesis/kafka/jdbc, and target to s3/glue DC. Visual job dashboard shows overview, status, run times.
+
+Glue databrew is a visual data preparation tool, UI for pre-processing large datasets. It's more specific than glue studio. it's simpler, take a data source, apply transformations, and put output in S3. No for complicated workflows, just for simple transformation. 250 ready-make transformation. It can integrate with KMS (customer master keys only), SSL in transit, IAM, CloudTrail.
+
+visual view of the dataframe with the data sample, simple statistics.
+
+## lake formation
+
+Built on top of glue, makes it easy to set up a **secure** data lake. Loads data and monitors data flows, sets up partitions, helps with encryption and managing keys, defines transformation jobs and monitors them. Helps with access control, auditing. Source can be S3, or databases on-prem too.
+
+Lake formation doesn't cost anything, but the underlying services do: Glue, S3, etc.
+
+Steps in lake formation:
+
+1. IAM user for data analyst
+2. create aws glue connection to your data source
+3. create s3 bucket for the datalake
+4. register s3 path in LK, grant permissions
+5. create datbase in LK for data catalog, grant permissions
+6. Use blueprint for a workflow (ie database snapshot)
+7. Run workflow
+8. Grant SELECT permissions to whoever needs to read it (athena, redshift spectrum etc.)
+
+LK supports cross-account permissions, but recipient must be set up as datalake administrator. You can use aws RAM (resource access manager) for accounts external to your organization. LK doesn't support manifests in Athena or Redshift queries. to encrypt data catalogs in LK, you need IAM permissions on the KMS encryption key. Data permission can be made super specific
+
+"Governed Tables" support ACID transactions across multiple tables. You can set up granular access control with row and cell-level security.
+
+allows cross-account access to data catalog metadata and underlying data. Large orgas use many AWS accounts.. users can use glue etl jobs, to query and join table across multiple accounts and still take advantage of lake formation table-level and column-level data protections. you can share data catalogs with other accounts
+
+## EMR
+
+* [EMR developer experience workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/3c29bc13-0f30-42f7-9f97-4ce8e2ef9b17/en-US)
+
+Elastic MapReduce. Managed Hadoop framework on EC2 instances. Includes Spark, HBase, Presto, Flink, Hive etc. You can get involved with Spark much deeper than you can with Glue. in EMR Notebooks you can use your own code to interact with the clusters.
+
+EMR cluster:
+
+* Master node: leader node, manages cluster
+  * Tracks status of tasks, monitors cluster health
+  * Single EC" instance
+* Core node: runs tasks and hosts HDFS data
+  * Can be scaled up and down, but with some risk
+  * Multi-node clusters have at least one core node
+* Task node: runs tasks, does not store data
+  * Optional node in the cluster
+  * No risk of data loss when removing
+  * Good use of spot instances
+
+---
+
+* Transient cluster: will terminate once all steps are complete
+  * Load data, process, store. then shut down. saves money
+* Long-running clusters must be manually terminated
+  * Cluster becomes a data warehouse with periodic processing on large datasets
+  * Can spin up task nodes using spot instances for temporary capacity
+  * can use reserved instances on long-running clusters to save money
+  * Has termination protection on by default, auto-termination off
+
+Cluster frameworks and apps are specified at cluster launch. You can connect to master node to run jobs directly.
+
+The EMR instances run on EC2, AWS Data Pipeline can be used to schedule and start clusters.
+
+> Storage options in EMR
+
+* Storage is done in HDFS (hadoop distributed file system). multiple copies are stored across cluster instances for redundancy. HDFS are ephemeral, data is lost when cluster is terminated. It's useful for caching intermediate results with significant random I/O.
+* By using EMRFS, you can access S3 as if it were HDFS, allows persistent storage after cluster termination. S3 is now since 2021 strongly consistent
+* You can use local filesystem for femporary data like buffers or caches
+* EBS for HDFS is possible, but ephemeral. EBS volumes can only be attached when launching a cluster. if you manually detach an EBS volume, EMR treats it as a failure and replaces it.
+
+> EMR features
+
+* Pricing: charged by the hour + EC2 charges
+* Provisions new nodes if a core node fails
+* Can add and remove task nodes on the fly
+* Can add and remove core nodes, but with the risk of data loss
+* Can resize a running cluster's core nodes, which increases both processing and HDFS capacity
+
+> Scaling
+
+EMR provides managed scaling, supports scaling in instance groups and instance fleets. Scales spot, on-demand and instances in a savings plan. Available for Spark, Hive, YARN.
+
+* Scale-up strategy: first add core nodes, then task nodes, up to max units specified
+* Scale-down strategy: first remove task nodes, then core nodes, no further than min constraints
+* spot nodes always removed before on-demand nodes
+
+> Security
+
+EMRFS has S3 encryption, TLS in transit between EMR nodes and S3, also local disk encryption, spark communication between drivers & executors is encrypted, hive communication between Glue Metastore and EMR uses TLS
+
+> Hadoop
+
+* MapRedice: framework for distributed data processing, maps data to key-value pairs. Reduces intermediate results to final output. Supplanted by Spark
+* YARN: Yet Another Resource Negotiator: manages cluster resources for data processing frameworks
+* HDFS: Hadoop distributed file system: distributes data blocks across cluster in a redundant manner. Ephemeral in EMR.
+
+> EMR serverless
+
+Let EMR choose how many worker nodes it needs, they are provisioned as needed, automatically.
+
+* Choose EMR release and runtime (spark, hive, presto)
+* Submit queries/scripts via job run requests
+* Underlying capacity managed by EMR
+  * But you can specify default worker sizes and pre-initialized capacity
+  * EMR computes resources needed for jobs and schedules workers accordingly
+  * All within one region, across many AZs
+
+To use EMR serverless:
+
+1. IAM user
+2. Use aws cli for steup
+3. Set up job execution role, allow emr-serverless service, s3 access, glue access, kms keys
+4. Create EMR serverless app
+5. Add job (e.g. spark script, hive query) within this app
+6. Obtain outputs and logs
+
+EMR serverless app lifecycle: creating, created. starting, started. stopping, stopped. terminated. To go to the next step, API calls need to be made
+
+EMR_S has pre-initialized capacity, spark adds 10% overhead to memory requested for drivers and executors. Be sure that initial capacity is at least 10% more than requested by the job.
+
+> Spark
+
+Distributed processing framework for big data
+
+* Has in-memory caching, optimized query execution
+* Supports Java, Scala, Python and R
+* Supports code reuse across
+  * Batch processing
+  * Interactive queries (spark sql)
+  * Real-time analytics
+  * ML (MLlib)
+  * Graph processing
+* Spark streaming is integrated with kinesis, kafka, on EMR
+* Spark is NOT meant for OLTP (not for thousands of transactions per second), it's for OLAP (longer-live queries that take longer), for analysis
+
+Spark apps are run as independent processes on a cluster. SparkContext (driver program) coordinates them and uses Cluster manager. It sends app code and tasks to executors, which run computations and store data.
+
+sparksql is distributed query engine for very fast queries, like jdbc, odbc, json, hdfs, parquet, etc. it gives a sql type interface on top of data
+
+## Redshift
+
+Redshift spectrum can query big filesize data in s3, serverless like athena.
+
+store files in s3 (cost effective), analyze using redshift (cheaper than Athena)
