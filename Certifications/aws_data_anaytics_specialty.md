@@ -21,13 +21,14 @@
     - [2.1 S3](#21-s3)
     - [2.2 DynamoDB](#22-dynamodb)
   - [3. Processing](#3-processing)
-    - [3.1 Athena](#31-athena)
-    - [3.2 Glue](#32-glue)
-    - [3.3 lake formation](#33-lake-formation)
-    - [3.4 EMR](#34-emr)
-    - [3.5 Redshift](#35-redshift)
+    - [3.1 Glue](#31-glue)
+    - [3.2 Lake formation](#32-lake-formation)
+    - [3.3 EMR](#33-emr)
+    - [3.4 Data pipeline](#34-data-pipeline)
   - [4. Analysis](#4-analysis)
-    - [X.X Data pipeline](#xx-data-pipeline)
+    - [4.1 Kinesis data analytics (KDA)](#41-kinesis-data-analytics-kda)
+    - [X.X Redshift](#xx-redshift)
+    - [3.1 Athena](#31-athena)
 
 ![ ](img/aws_data_analytics_specialty/data_lake_warehouse.jpg)
 
@@ -54,7 +55,7 @@ Kinesis types:
   * built-in lambda capability for data transform
 * **Kinesis data analytics**: real-time analytics on the streaming data. not ingesting, but analytics
   * SQL: query and analyze streaming data
-  * Apache Flink: stateful stream processing
+  * Apache Flink: stateful stream processing, supports Java and Scala
 * **Video streams**: stream videos inside aws
 
 Stream workflow:
@@ -112,8 +113,10 @@ Capacity mode:
   * **Compression can be implemented, but by the user**
   * Batching enabled by default, it increases throughput and decreases cost
     * Aggregation puts several records together (but <1MB), increases latency, but increases efficiency
+  * KPL can incur an additional processing delay of up to RecordMaxBufferedTime within the library. Larger values of this variable result in higher packing efficiencies and better performance. Apps that cannot tolerate this additional delay need to use the SDK directly.
 * Kinesis Agent
   * Installed agent in your app, Java based, built on top of KPL, monitors log files and sends them to data streams
+  * But for EC2, no need for agent you can use cloudwatch logs
   * Writes from multiple dirs and writes to multipls streams
 
 Network timeouts might create duplicate records, that records are written twice, and they will get unique sequence id. To fix it, embed unique record ID in the data to de-duplicate on the consumer side.
@@ -141,6 +144,8 @@ Network timeouts might create duplicate records, that records are written twice,
 * Lambda
   * it can de-aggregate from KPL
   * can be used to run lightweight ETL to s3, dynamodb, redshift, elasticsearch
+
+**KDS cannot deliver data directly to S3**
 
 The user has to design a partition key and throughput, according to that shards get allocated. A bad partition key would mean that certain shards are overloaded or hot.
 
@@ -180,6 +185,8 @@ Resharding can't be done in parallel, you have to plan capacity in advance. You 
 * ProvisionedThroughputExceedException errors, partition key is well designed. Solution: increase shard (scaling), retried with backoff, make a better PK
 * RecordMaxBufferTime error, increase batch efficiency by delay
 * ExpiredIteratorException KCL error, increase WCU of Dynamodb
+
+If bad performance on write, use random partition keys, and update shard count. retry and exponential backoff won't help.
 
 > Security
 
@@ -541,19 +548,9 @@ More in-depth information about DynamoDB in the [DynamoDB Lab](https://amazon-dy
 
 ## 3. Processing
 
-### 3.1 Athena
+### 3.1 Glue
 
-serverless, used for querying the data
-
-can't read from glacier
-
-Athena workgroups are used to isolate queries for teams, apps or different workloads. you can create separate workgroups for different eams, and give different permissions, enforce cost constraints. you can track query-related metrics for all workgroup queries. IAM groups cannot manage the isolation of queries and tracking query history for teams
-
-Athena suport susing ODBC and JDBC drivers, allowing you to report and visualize all data in s3 with the tools of your choice
-
-athena allows you to set two types of cost contorls: per-query limit and per-workgroup limit. works with SNS
-
-### 3.2 Glue
+#TODO review https://docs.aws.amazon.com/glue/index.html
 
 * [Glue studio workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/71b5bdcf-7eb1-4549-b851-66adc860cd04/en-US)
 * [Glue workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/aaaabcab-5e1e-4bff-b604-781a804763e1/en-US)
@@ -581,11 +578,17 @@ Hive lets you run sql-like queries from EMR. the glue data catalog can serve as 
 
 Glue ETL automatically generates code to transform data, in Scala or python. can be encrypted at rest or in transit. It can be event driven (by glue triggers) or ran in schedule with glue Scheduler.
 
-It can provision additional DPUs (data processing unit) to increase performance of underlying spark jobs. you can enable job metrics to know the max. capacity in DPUs that you need
+It can provision additional DPUs (data processing unit) to increase performance of underlying spark jobs. you can enable job metrics to know the max. capacity in DPUs that you need. With this, you can change the max. capacity parameter value and set it to a higher number if you want the job to finish faster.
+
+Job bookmark maintains state information and prevents glue from reprocessing old data, so you can stop the job at some point and then resume it from that point, not from the beginning.
+
+
 
 Glue ETL can: transform, clean, enrich data before doing analysis. It generated code in python/scala, and you can modify the code to tune it to your usecases. You can also provide your own code in Spark or PySpark scripts.
 
 Target of Glue ETL can be S3, RDS, Redshift or Glue data catalog.
+
+By using DynamocFrameWriter class in Glue, you can replace the existing rows in the Redshift table before persisting the new data, thus avoiding dubplicates
 
 Glue ETL is fully managed, cost effective, pay only what you use. Jobs are run on a serverless Spark platform.
 
@@ -644,7 +647,13 @@ Glue databrew is a visual data preparation tool, UI for pre-processing large dat
 
 visual view of the dataframe with the data sample, simple statistics.
 
-### 3.3 lake formation
+if we want custom naming in the S3 bucket, we have to create a Table in Glue, and then write a glue ETL script to update table partitions every time a new partition comes.
+
+Glue can crawl data in different regions, when you define a S3 datastore to crawl, you choose whether to crawl a path in your account or another account.
+
+A classifier reads the data in a data store, if it recognizes the format of the data, it generates a schema. classifier also returns a certainty number to indicate how certain the format recognition was. glue provides built-in classifiers, but you can create custom ones too. glue invokes custom classifiers furst. if a classifier returns certainty=1.0, then it's 100% certain that it can create the correct schema. if no classifier returns certainty=1.0, glue uses the output of the classifier with the highest certaints, and if no classifier returns a certainty higher than 0.0, glue returns the default classification string of UNKNOWN.
+
+### 3.2 Lake formation
 
 Built on top of glue, makes it easy to set up a **secure** data lake. Loads data and monitors data flows, sets up partitions, helps with encryption and managing keys, defines transformation jobs and monitors them. Helps with access control, auditing. Source can be S3, or databases on-prem too.
 
@@ -667,7 +676,7 @@ LK supports cross-account permissions, but recipient must be set up as datalake 
 
 allows cross-account access to data catalog metadata and underlying data. Large orgas use many AWS accounts.. users can use glue etl jobs, to query and join table across multiple accounts and still take advantage of lake formation table-level and column-level data protections. you can share data catalogs with other accounts
 
-### 3.4 EMR
+### 3.3 EMR
 
 * [EMR developer experience workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/3c29bc13-0f30-42f7-9f97-4ce8e2ef9b17/en-US)
 
@@ -698,6 +707,12 @@ EMR cluster:
 
 Cluster frameworks and apps are specified at cluster launch. You can connect to master node to run jobs directly.
 
+Master node recommended m5.xlarge if less than 50 nodes. Spot instances are a good choice for task nodes, and only use on core & master if you're testing or very cost sensitive, there's a risk of partial data loss. For ML apps, use compute optimized instance.
+
+To grant access to the cluster, add your IP as a TCP inbound rule in the cluster's security group.
+
+If the app is SLA bound and the task node should complete even at on-demand price, then choose "switch to on-demand"
+
 The EMR instances run on EC2, AWS Data Pipeline can be used to schedule and start clusters.
 
 > Storage options in EMR
@@ -705,7 +720,7 @@ The EMR instances run on EC2, AWS Data Pipeline can be used to schedule and star
 * Storage is done in HDFS (hadoop distributed file system). multiple copies are stored across cluster instances for redundancy. HDFS are ephemeral, data is lost when cluster is terminated. It's useful for caching intermediate results with significant random I/O.
 * By using EMRFS, you can access S3 as if it were HDFS, allows persistent storage after cluster termination. S3 is now since 2021 strongly consistent
 * You can use local filesystem for femporary data like buffers or caches
-* EBS for HDFS is possible, but ephemeral. EBS volumes can only be attached when launching a cluster. if you manually detach an EBS volume, EMR treats it as a failure and replaces it.
+* EBS for HDFS is possible, but ephemeral. When you terminate a cluster, EMR deletes the EBS volume. EBS volumes can only be attached when launching a cluster. if you manually detach an EBS volume, EMR treats it as a failure and replaces it.
 
 > EMR features
 
@@ -729,7 +744,7 @@ EMRFS has S3 encryption, TLS in transit between EMR nodes and S3, also local dis
 
 > Hadoop
 
-* MapRedice: framework for distributed data processing, maps data to key-value pairs. Reduces intermediate results to final output. Supplanted by Spark
+* MapReduce: framework for distributed data processing, maps data to key-value pairs. Reduces intermediate results to final output. Supplanted by Spark
 * YARN: Yet Another Resource Negotiator: manages cluster resources for data processing frameworks
 * HDFS: Hadoop distributed file system: distributes data blocks across cluster in a redundant manner. Ephemeral in EMR.
 
@@ -772,24 +787,77 @@ Distributed processing framework for big data
 * Spark streaming is integrated with kinesis, kafka, on EMR
 * Spark is NOT meant for OLTP (not for thousands of transactions per second), it's for OLAP (longer-live queries that take longer), for analysis
 
-Spark apps are run as independent processes on a cluster. SparkContext (driver program) coordinates them and uses Cluster manager. It sends app code and tasks to executors, which run computations and store data.
+Spark apps are run as independent processes on a cluster. SparkContext (driver program) coordinates them and uses Cluster manager. It sends app code and tasks to executors, which run computations and store data. To run the spark script, do `spark-submit my_script.py`
 
 sparksql is distributed query engine for very fast queries, like jdbc, odbc, json, hdfs, parquet, etc. it gives a sql type interface on top of data
 
-### 3.5 Redshift
+Can be integrated with Kinesis, spark streaming can be a consumer from KDS.
 
-Redshift spectrum can query big filesize data in s3, serverless like athena.
+Spark can also be integrated with Redshift, it allows spark datasets from redshift. it's like a spark sql data source. It's useful for ETL in Redshift with Spark. Usecase: lots of data in S3, open to Redshift, start a spark cluster on EMR, use that to do ETL and write again to Redshift.
 
-store files in s3 (cost effective), analyze using redshift (cheaper than Athena)
+> Hive
 
+Interface to do SQL on unstructured data sitting in EMR. It uses HiveQL, similar to SQL, it's interactive, it's scalable, easy OLAP queries, highly optimized, highly extensible. It's the most appropriate way for data warehouse application, more comfortable than Spark.
 
-## 4. Analysis
+By default, Hive records metastore info in a MySQL on the master node's filesystem. if you want the metastore to persist, you must create an external metastore existing outside the cluster. Also to have a centralized metastore in Hive, you have to use an external service, like Glue Data Catalog, or RDS or Aurora.
 
-### X.X Data pipeline
+Hive maintains a "metastore" that imparts a structure you define on the unstructured data stored on HDFS for instance. By default, the metastore is stored in MySQL on the master node, but external metastores offer better resiliency/integration if the cluster shuts down, e.g. glue data catalog (equivalent to hive metastore, but external metastore for hive) or RDS.
+
+Other Hive integrations, you can load table partitions from S3, write tables in S3, load scripts from S3, or use DynamoDB as an external table.
+
+> Apache Pig
+
+Comes installed in EMR directly. Pig is a solution for writing mappers and reducers faster, with Pig Latin, a scripting language with SQL-like syntax. Highly extensible with user defined functions. It's integrated to S3.
+
+> Apache HBase
+
+Non-relational, petabyte-scale database, based on Google's BigTable, on top of HDFS. It's very fast because it does processing in-memory. Hive integration. It's very similar for DynamoDB. HBase advantages:
+
+* Efficient storage of sparse data
+* Appropriate for high frequency consistent reads and writes
+* High write and update throughput
+* More integration with Hadoop
+
+DynamoDB:
+
+* Fully managed (auto-scaling)
+* More integration with other AWS services, like Glue
+
+> Presto
+
+**Interactive queries at petabyte scale** for OLAP type queries. It can connect to many different big data databases and data stores at once, and query across them. Athena uses this under the hood, Athena is basically serverless Presto.
+
+> Apache Zeppelin
+
+Notebook on EMR to run Python scripts against your data. Can interleave with notes, can share notebooks with others etc. Can integrate with Spark, to run Spark code interactively, allows for easy experimentation and exploration. Can execute SQL directly against SparkSQL. Query results can be visualized in charts and graphs.
+
+EMR notebook is similar to Zeppelin but with more AWS integration, notebook backed up to S3 and hosted inside VPC, you can provision clusters from the notebook. It connects to the clutser via Apache Livy. Accessed only via AWS console
+
+> Hue
+
+Hadoop user experience, the graphical frontend for the cluster. IAM and S3 integration
+
+> Splunk
+
+Operational tool, can be used to visualize EMR and S3 data using the EMR hadoop cluster. Makes machine data accessible, usable and valuable.
+
+> Flume
+
+Another way to stream data into che cluster, originally made to handle log aggregation
+
+> MXNet
+
+Deep learning on EMR
+
+> S3DistCP
+
+Tool for copying large amounts of data S3 <-> HDFS
+
+### 3.4 Data pipeline
 
 Managed ETL service for scheduling regular data movement and processing. Integrated with on-prem and cloud.
 
-dependency of tasks, waits for the previous tasks.
+dependency of tasks, waits for the previous tasks. Supports cross-region pipelines
 
 A pipeline definition specifies the business logic of your data management. From the definition, DP determines the tasks, schedules them and assigns them to task runners.
 
@@ -798,3 +866,62 @@ A pipeline schedules and runs tasks by creating EC2 instances to perform the def
 If a task is not completed successfully, Data Pipeline retries the task according to your instructions and, if necessary, reassigns it to another task runner. If the task fails repeatedly, you can configure the pipeline to notify you.
 
 ![ ](img/aws_data_analytics_specialty/data_pipeline.jpg)
+
+## 4. Analysis
+
+### 4.1 Kinesis data analytics (KDA)
+
+Serverless analytics service, pay what you consume, but not cheap. Supports schema discovery, it tries to find the data schema.
+
+RANDOM_CUT_FOREST is a SQL function used to detect anomalies on numeric columns in data stream
+
+Reference tables are inexpensive ways to join data for quick lookups, i.e. look up the city associated with a zip code. Mapping is stored in S3.
+
+SQL queries in your app code execute over in-app streams, this represents unbounded data that flows continuously through your app, and to get results sets from this continuously updating input, you often bound queries using a window defined in terms of time or rows.
+
+* Stagger window: a query that aggregates data using keyed time-based windows that open as data arrives. the keys allow for multiple overlapping windows. It's suited for data that arrives at inconsistent times. Stagger windows are the recommended way to aggregate data using time-based windows, because they reduce late our out-of-order data compared to tumbling windows
+* Tumbling windows: query that aggregates data using distinct time-based windows that open and close at regular intervals, individual records might fall into separate windows, so partial results must be combined later.
+* Sliding windows: a query that aggregates data continuously, using a fixed time or row count interval
+
+KDA can deliver to KDS, KDF, Lambda, and these can write to s3 or DynamoDB.
+
+
+> Apache Flink
+
+Apache Flink is a framework for processing data streams, can work with Java and Scala. KDA integrates Fink with AWS, making it serverless. Instead of using SQL, you can develop your own Flink app from scratch and load it into KDA via S3. Sources for Flink can be KDS, or MSK
+
+Uses for KDA:
+
+* Streaming ETL
+* Continuous metric generation
+* Responsive analytics
+
+
+### X.X Redshift
+
+Redshift can be used to efficiently query and retrieve structured and semi-structured data from files in S3 without having to load the data into Redshift native tables, you can create external tables by defining the structure for files and registering them as tables in glue data catalog.
+
+Redshift spectrum can query petabyte data in s3, without bringing data to Redshift. It's serverless like athena but more scalable.
+
+store files in s3 (cost effective), analyze using redshift (cheaper than Athena)
+
+The COPY command is a parallel command to load files from S3 into Redshift. To improve loading times, split large files into smaller chunks.
+
+INSERT command is to move data from one table to another
+VACUUM re-sorts rows and reclaims space 
+
+
+
+### 3.1 Athena
+
+#TODO review https://docs.aws.amazon.com/athena/index.html
+
+serverless, used for querying the data
+
+can't read from glacier
+
+Athena workgroups are used to isolate queries for teams, apps or different workloads. you can create separate workgroups for different eams, and give different permissions, enforce cost constraints. you can track query-related metrics for all workgroup queries. IAM groups cannot manage the isolation of queries and tracking query history for teams
+
+Athena suport susing ODBC and JDBC drivers, allowing you to report and visualize all data in s3 with the tools of your choice
+
+athena allows you to set two types of cost contorls: per-query limit and per-workgroup limit. works with SNS
