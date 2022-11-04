@@ -27,8 +27,9 @@
     - [3.4 Data pipeline](#34-data-pipeline)
   - [4. Analysis](#4-analysis)
     - [4.1 Kinesis data analytics (KDA)](#41-kinesis-data-analytics-kda)
-    - [X.X Redshift](#xx-redshift)
-    - [3.1 Athena](#31-athena)
+    - [4.2. Opensearch](#42-opensearch)
+    - [4.3 Athena](#43-athena)
+    - [4.4 Redshift](#44-redshift)
 
 ![ ](img/aws_data_analytics_specialty/data_lake_warehouse.jpg)
 
@@ -157,6 +158,8 @@ Consumer retries can make the app read the same data twice. This can happen when
 * The app is deployed
 
 To fix it, make your consumer app idempotent (that there's no side effects for reading the same data twice), and that try to handle duplicates in the final destination.
+
+If a record arrives late to the app during stream processing, it's written into the error stream.
 
 > Resharding
 
@@ -885,6 +888,7 @@ SQL queries in your app code execute over in-app streams, this represents unboun
 
 KDA can deliver to KDS, KDF, Lambda, and these can write to s3 or DynamoDB.
 
+Kinesis Data Analytics provisions capacity in the form of Kinesis Processing Units (KPU). A single KPU provides you with the memory (4 GB) and corresponding computing and networking. The default limit for KPUs for your application is eight, so the default capacity of the processing app in terms of memory is 32GB.
 
 > Apache Flink
 
@@ -896,12 +900,128 @@ Uses for KDA:
 * Continuous metric generation
 * Responsive analytics
 
+### 4.2. Opensearch
 
-### X.X Redshift
+Fully managed (no serverless, AWS manages the EC2 but you have to decide how many servers in your clusters, no autoscaling) petabyte-scale analysis and reporting, originally started as search engine. For some types of queries, OS can be faster than Spark. You can create a data pipeline with Kinesis, OS and then Dashboards for visualization. Very storage heavy
+
+Main concepts:
+
+* Documents: things you're looking for, can be text, can be json. Every document has a unique ID and a type
+* Types: they define the scema and mapping shared by documents that represent the same sort of thing. Still in ES6, but obsolete in future versions
+* Indices: an index powers search into all docs within a collection of ypes. They contain inverted indices that let you search across everything within them at once
+
+An index is split into shard, each shard might be on a different node in a cluster. Every shard is a self-contained mini search engine. The index has two primary shards and two replicas.
+
+* Write requests are routed to the primary shard, then replicated
+* Read requests are routed to the primary or any replica
+
+Options:
+
+* To import data into OS: Kinesis, DynamoDB, Logstash / Beats, and Elasticsearch's native API's
+* OS can scale up and down without downtime, but it has to be set up. Pay for what you use, instance-hours (charge even if idle, if not using them, just shut them down), storage, data transfer.
+* You have to choose how many master nodes you want, and their instance type
+  * Recommended: 3 dedicated master nodes, 3 data nodes
+  * With two, you can have split-brain problem where we don't know which of the two nodes is the actual primary node. With three, the third master node decides which would be the primary
+* Snapshots to S3
+* Most common problem in OS is to run out of disk space, so you have to calculate the minimum storage requirement: source_data * (1 + num_replicas) * 1.45
+* You have to choose the number of shards as well
+  * If shard allocation across nodes is unbalanced, you can get memory pressure
+  * If you see JVMMemoryPressure errors, get fewer shards by deleting old or unused indices
+
+Security:
+
+* Resource-based policies
+* Identity-based policies
+* IP-based policies
+* Request signing
+* You can put the cluster in a VPC. You have to decide that upfront, you can't move it later
+  * How to access cluster if it's in VPC
+    * Cognito
+    * Nginx reverse proxy on EC2 forwarding to ES domain
+    * SSH tunnel for port 5601
+    * VPC direct connect
+    * VPN
+* Cognito integration for the dashboard
+
+OS antipatterns:
+
+* Not suitable for OLTP, for that use RDS/DynamoDB
+* Not suitable for ad-hoc data querying, for that use Athena
+
+Storage types, data can be migrated between different storage types
+
+* Hot: used by standard data nodes, instance stores or EBS volumes. fastest performance, most expensive
+* UltraWarm: uses S3 and caching, best for indices with few writes (like log data or immutable data), slower performance but much lower cost. Requires you to have a dedicated master node
+* Cold: uses S3, suitable for periodic research or forensic analysis on older data, must have dedicated master and have UltraWarm enabled, not compatible with T2 or T3 instance types on data nodes.
+
+Index state management (ISM) automates index management policies, e.g.deletes old indices after a period of time, or moves indices into read only state after some time, or move indices between storage types, reduce replica count over time, automate index snapshot. ISM policies run every 30-48 mins, random jitter to ensure they don't all run at once. It can send notification when it's done.
+
+You can periodically roll up old data into summarized indices, maybe with old data you don't need the whole old data but just the summary. Saves storage costs.
+
+You can transform indexes, to create a different view to analyze data differently It supports grouping and aggregation.
+
+To ensure high availability or replicate data geographically for better latency, you can replicate indices/mappings/metadata across domains (clusters). The "follower" index (replica) pulls data from "leader" index. to enable this, we need fine-grained access control and node-to-node encryption.
+
+Remote reindex allows copying indices (not the whole cluster) from one cluster to another on demand.
+
+### 4.3 Athena
+
+#TODO review https://docs.aws.amazon.com/athena/index.html
+
+Serverless service for interactive queries for S3 (but not from Glacier), data stays in S3. It uses Presto under the hood. Supports these data formats: csv, json, ORC, parquet, avro.
+
+Good solution for:
+
+* ad-hoc queries of logs for example
+* querying staging data before loading to redshift
+* analyze cloudtrail or similar logs in S3
+* Integration with Jupyter, Zeppelin, Rstudio notebooks
+* Integration with QuickSight
+* Integration via ODBC/JDBC with other visualization tools
+
+Once you have a Glue data catalog for S3 data, Athena see is automatically and make a table for it automatically.
+
+You can organize users, teams, apps workloads into Workgroups, to isolate and control query access and track costs by Workgroup. you can create separate workgroups for different teams, and give different permissions, enforce cost constraints. you can track query-related metrics for all workgroup queries. IAM groups cannot manage the isolation of queries and tracking query history for teams.
+
+Pricing: you're charged by TB scanned, and only successful or cancelled queries count, failed queries don't. To save money using Athena, use columnar formats like ORC, Parquet. You get less costs and better performance
+
+athena allows you to set two types of cost controls: per-query limit and per-workgroup limit. works with SNS.
+
+To optimize performance, have smaller number of large files than many small files. Also use partitions.
+
+Athena provides ACID transactions, concurrent users can safely make row-level modifications. You can also recover recently deleted data with SELECT statement.
+
+### 4.4 Redshift
+
+Fully-managed (not serverless!) petabyte-scale data warehouse, designed for online analytic processing. Designed for OLAP, not OLTP (transaction). It can scale up and down on demand, and has built-in replication and backups.
+
+The cluster is composed of the leader node, connecting to the client via JDBC/ODBC, and the compute nodes.
+
+**Redshift Spectrum** can query exabytes of unstructured data in S3 without loading. It's serverless like Glue data catalog + Athena but instead of having console-based query sql engine, it looks like a table in the Redshift database. It provides limitless concurrency, horizontal scaling.
+
+Redshift has massively parallel processing, columnar data storage and columnar compression.
+
+Key points:
+
+* Automatic data replication within the cluster
+* Automatic backup to S3
+* Automatic async replicated to another region
+* Automated snapshots
+* Failed nodes or drivers are automatically replaced
+* However, Redshift is limited to one AZ.
+* Scaling is done vertically and horizontally on demand, but with downtime.
+  * A new cluster is created and the old on remains availabla as read. then the CNAME flipped to new cluster (downtime), then data moved in parallel to the new cluster.
+
+Decide how data is distributed among the nodes and the slices according to the distribution style you chose during table creation. The styles:
+
+* Auto: the service decides based on data size
+* Even: rows distributed across slices in round-robin
+* Key: rows distributed based on one column
+* All: entire table is copied to every node
+
+---
 
 Redshift can be used to efficiently query and retrieve structured and semi-structured data from files in S3 without having to load the data into Redshift native tables, you can create external tables by defining the structure for files and registering them as tables in glue data catalog.
-
-Redshift spectrum can query petabyte data in s3, without bringing data to Redshift. It's serverless like athena but more scalable.
 
 store files in s3 (cost effective), analyze using redshift (cheaper than Athena)
 
@@ -911,17 +1031,4 @@ INSERT command is to move data from one table to another
 VACUUM re-sorts rows and reclaims space 
 
 
-
-### 3.1 Athena
-
-#TODO review https://docs.aws.amazon.com/athena/index.html
-
-serverless, used for querying the data
-
-can't read from glacier
-
-Athena workgroups are used to isolate queries for teams, apps or different workloads. you can create separate workgroups for different eams, and give different permissions, enforce cost constraints. you can track query-related metrics for all workgroup queries. IAM groups cannot manage the isolation of queries and tracking query history for teams
-
-Athena suport susing ODBC and JDBC drivers, allowing you to report and visualize all data in s3 with the tools of your choice
-
-athena allows you to set two types of cost contorls: per-query limit and per-workgroup limit. works with SNS
+#TODO OLAP (analytics) vs. OLTP? OLTP for transaction, row-based
