@@ -30,6 +30,8 @@
     - [4.2. Opensearch](#42-opensearch)
     - [4.3 Athena](#43-athena)
     - [4.4 Redshift](#44-redshift)
+  - [5. Visualization](#5-visualization)
+    - [5.1. Quicksight](#51-quicksight)
 
 ![ ](img/aws_data_analytics_specialty/data_lake_warehouse.jpg)
 
@@ -993,13 +995,17 @@ Athena provides ACID transactions, concurrent users can safely make row-level mo
 
 ### 4.4 Redshift
 
-Fully-managed (not serverless!) petabyte-scale data warehouse, designed for online analytic processing. Designed for OLAP, not OLTP (transaction). It can scale up and down on demand, and has built-in replication and backups.
+Fully-managed (not serverless!) petabyte-scale data warehouse for structured data (for unstructured, use ETL on EMR), designed for online analytic processing. Designed for OLAP, not OLTP (transaction, for this use RDS or DynamoDB). It can scale up and down on demand, and has built-in replication and backups.
 
 The cluster is composed of the leader node, connecting to the client via JDBC/ODBC, and the compute nodes.
 
-**Redshift Spectrum** can query exabytes of unstructured data in S3 without loading. It's serverless like Glue data catalog + Athena but instead of having console-based query sql engine, it looks like a table in the Redshift database. It provides limitless concurrency, horizontal scaling.
+**Redshift Spectrum** can query exabytes of unstructured data in S3 without loading. It's serverless like Glue data catalog + Athena but instead of having console-based query sql engine, it looks like a table in the Redshift database. It provides limitless concurrency, horizontal scaling. Difference between Spectrum and Glue is that Redshift is thought of more for reporting and analysis, and Glue is for complex transformations. And Athena is faster and cheaper, just runs queries against S3 data.
 
 Redshift has massively parallel processing, columnar data storage and columnar compression.
+
+Redshift supports data lake export to S3 in Parquet format.
+
+AQUA, accelerated query accelerator, is for apps that use S3 and Redshift. Pushes reduction and aggregation queries closer to the data, it has high-bandwidth connection to S3.
 
 Key points:
 
@@ -1019,16 +1025,90 @@ Decide how data is distributed among the nodes and the slices according to the d
 * Key: rows distributed based on one column
 * All: entire table is copied to every node
 
+Sort keys. Similar to indices. When storing data on disk, rows are stored in sorted order based on the column you designated as sort key. It makes for fast range queries. If you will query based on recency, then make a time-based sort key.
+
+Importing / exporting data:
+
+* COPY: parallel command to load files from S3/EMR/DynamoDB into Redshift
+  * This command adds hidden metadata columns
+  * This command can also decrypt data as it's loadad from S3
+  * Compression is supported to speed it up even more
+  * To improve loading times, split large files into smaller chunks
+  * Narrow tables (many rows, few columns), load it with one COPY transaction
+* UNLOAD: unload from a table into files in S3
+* INSERT: command is to move data from one table to another, data is already in Redshift
+* VACUUM: recover space from deleted rows, it re-sorts rows and reclaims space
+
+To copy a snapshot from a KMS-encrypted cluster in another region for backup, then:
+
+1. In destination region, create KMS key
+2. Specify unique name for the snapshot copy grant
+3. Specify KMS key ID for which you're creating the copy grant
+4. In the source region, enable copying of snapshots to the copy grant created above
+
+With DBLINK, Redshift can be connected to PostgreSQL and enable copying and syning data between PostgreSQL and Redshift.
+
+Redshift workload management: prioritize short, fast queries vs. long, slow queries. You can also create query queues.
+
+With short query acceleration, we can prioritize short-running queries over long-running ones, by making short queries run in a dedicated space. Use this if you only have short queries, else use RWM
+
+Redshift clusters can be resized:
+
+* Elastic resize
+  * Quickly add/remove nodes of same type
+  * Downtime of a few minutes
+* Classic resize
+  * Change number of nodes and/or node type
+  * Cluster is read-only for hours, or days
+  * To keep cluster available during classic resize, use snapshot, restore, resize
+
+Security:
+
+* When using Hardware security module, you must use client + server certificate to configure a trusted connection
+  * If you migrate an unencrypted cluster to an HSM-encrypted cluster, you must create the new encrypted cluster and then move data to it
+* You can define access privileges for users or groups, with grant or revoke commands in sql
+
+Redshift serverless:
+
+* Automatically scale and provision for your workload
+* Uses ML to maintain performance across variable and sporadic workloads
+* Spectrum, public endpoints not supported
+* 
+
+To ccreate external tables, define the structure for files and register them as tables in glue data catalog.
+
+## 5. Visualization
+
+### 5.1. Quicksight
+
+Serverless tool for business analysts to analzye and visualize data, perform ad-hoc analysis. Allows creating dashboards and contains limited ETL. For more ETL, use Glue/Spark.
+
+Data sources: Redshift, Aurora/RDS, Athena, EC2-hosted dbs, Files (on-prem, s3).
+
+SPICE, super-fast parallel in-memory calculation engine, is used to accelerate interactive queries on large datasets. Each user gets 10GB of SPICE, it's highly available, durable, scalable to many users.
+
+It can accelerate large queries that would time out in direct query mode (=hitting Athena directly), but big queries might still time out on spice, if it takes >30mins to import the data from Athena into Spice.
+
+Security:
+
+* MFA
+* VPC connectivity
+* Row-level security
+* Private VPC access
+
+Quicksight can only access data stored in the same region as Redshift. If they're in different regions, create a new security group with an inbound rule authorizing access from the IP range of QuickSight servers in that region.
+
+Pricing:
+
+Enterprise is double as standard, and it's paid per user per month. Extra Spice capacity can be acquired too. Enterprise includes encryption at rest and microsoft AD integration.
+
+ML:
+
+* Random cut forest can find anomalies, outliers in the dataset
+* Random cut furest It can also do forecasting, detect seasonality and trends
+* Autonarratives, adds "story of your data" to your dashboard
+* Suggested insight: A new tab displays ready-to-use suggested insights.
+
 ---
-
-Redshift can be used to efficiently query and retrieve structured and semi-structured data from files in S3 without having to load the data into Redshift native tables, you can create external tables by defining the structure for files and registering them as tables in glue data catalog.
-
-store files in s3 (cost effective), analyze using redshift (cheaper than Athena)
-
-The COPY command is a parallel command to load files from S3 into Redshift. To improve loading times, split large files into smaller chunks.
-
-INSERT command is to move data from one table to another
-VACUUM re-sorts rows and reclaims space 
-
 
 #TODO OLAP (analytics) vs. OLTP? OLTP for transaction, row-based
