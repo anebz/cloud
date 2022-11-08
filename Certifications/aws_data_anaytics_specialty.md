@@ -32,6 +32,10 @@
     - [4.4 Redshift](#44-redshift)
   - [5. Visualization](#5-visualization)
     - [5.1. Quicksight](#51-quicksight)
+  - [6. Security](#6-security)
+    - [6.1. KMS](#61-kms)
+    - [6.2. CloudHSM](#62-cloudhsm)
+    - [6.3. STS](#63-sts)
 
 ![ ](img/aws_data_analytics_specialty/data_lake_warehouse.jpg)
 
@@ -69,6 +73,7 @@ Stream workflow:
 4. Send to final storage
   * S3: buffer size range is from 1MB to 128MB. buffer interval is from 60s to 90s. firehose can raise buffer size dynamically. data delivery failures, auto retries up to 24h
     * By default, firehose-s3 default prefix is already based on year,months,day,hour. if we have many devices, we want to use custom prefix based on device and date (in our example, once a day)
+    * If the queries are limited to one day's logs, rotate directories daily
   * Elasticsearch: same as for s3. custom retry duration up to 7200s, moves skipped files to s3 and provides a manifest file for manual entry
   * Redshift, depends on redshift to finish the COPY command. firehose issues a new copy command automatically. for data delivery failures, same as elasticsearch
 
@@ -195,7 +200,11 @@ If bad performance on write, use random partition keys, and update shard count. 
 
 > Security
 
-control access or auth with iam, encryption in flight using https endpoints, encryption at rest using kms. you can also implement encryption on client side. vpc endpoints are allowed, so that an ec2 instance in a private subnet can access the kinesis stream
+* You can control access or auth with iam
+* encryption in flight using https endpoints
+* encryption at rest using kms
+* you can also implement encryption on client side
+* vpc endpoints are allowed, so that an ec2 instance in a private subnet can access the kinesis stream
 
 #### 1.1.2 Kinesis Data Firehose
 
@@ -207,7 +216,7 @@ control access or auth with iam, encryption in flight using https endpoints, enc
 * Pay for the amount of aata going through Firehose
 * Spark/HCL cannot read from KDF, only from data stream
 
-Destinations: S3, Redshift (first S3, then copy through S3), ElasticSearch. Also 3rd party destinations like datadog, splunk, mongodb. and also custom destinations, like http endpoint.
+Destinations: S3, Redshift (first S3, then copy through S3), ElasticSearch. Also 3rd party destinations like datadog, splunk, mongodb. and also custom destinations, like http endpoint. **Lambda is not a possible destination**
 
 Firehose accumulates records in a buffer, which is flushed based on time and size rules. If size, if you make the rule of 32mb, then if that buffer size is reached, it's flushed. for time, if you set 2mins, it's flushed every 2mins. It can automatically increase the buffer size to increase throughput.
 
@@ -224,7 +233,15 @@ Differences with data stream
 * Data stream, you get for 1-365 days
   * Firehose: no data storage
 * Data stream, Lambda can be used additionally to insert data to a destination
-  * firehose: serverless data transformation with lambda
+  * Firehose: serverless data transformation with lambda
+* Data streams, has a configurable data rentention of between 1 and 365 days
+  * Firehose: 24h data retention
+
+Security:
+
+* IAM roles can deliver data to S3, ES, Redshift, Splunk
+* Can encrypt delivery stream with KMS, server-side encryption
+* VPC endpoints supported
 
 #### 1.1.3 Firehose lab
 
@@ -337,6 +354,14 @@ Consumers receive records from SQS, process them and delete them afterwards.
 * SQS max object size is 256kb (more if using extended lib), KDS is  1MB, and KDF is 128MB at destination
 * Kinesis streams for fast log and data intake and processing, real-time metrics and reporting, real-time data analytics, complex stream processing. read and replays records in same order, many apps can read from the same kinesis data stream, 1MB payload, data deleted after retention period, ordering of records is preserved at shard level, provisioned vs. on-demand mode with replay capability
 
+Security:
+
+* Encryption in-flight using HTTPS
+* Server-side encryption with KMS
+* SQS queue access policy
+* Client-side encryption is allowed, but must be implemented manually
+* VPC endpoint provided through an interface
+
 ### 1.3 IoT
 
 * Device gateway: entry point for IoT devices to AWS
@@ -348,10 +373,17 @@ Consumers receive records from SQS, process them and delete them afterwards.
 
 ![ ](img/aws_data_analytics_specialty/iot.jpg)
 
+Security:
+
+* IoT policies
+* IAM policies, to control access to IoT API
+* Roles can be attached to rules engine to perform their actions
+
 ### 1.4 Data migration
 
 * Data migration service (DMS): to migrate on-prem or EC2 databases into aws
   * With Schema conversion tool, you can convert the db schema from one engine to another
+  * Useful when you have an on-prem db and you want a read replica, which can't be instantiated from an on-prem db. Use DMS to migrate db to RDS or similar
 * Storage gateway: hybrid storage that connects on-prem to AWS. ideal for backup, bursting, tiering, migration
 * Data sync: 5x faster file transfers than open source tools, good for migration data into EFS or moving between cloud file systems
 * S3 transfer acceleration: fast transfers in and out of s3, ideal when working with long geographic distances
@@ -446,7 +478,13 @@ With access points, create one access point per prefix, and grant access to diff
 
 With S3 object Lambda, you can change the objects before it's retrieved by the caller application, without creating another object. for that, we need 1 bucket, an access point and an object lambda access point.
 
-S3 now has strongly consistency for all operations
+S3 now has strongly consistency for all operations.
+
+Glacier Select: to query cold data stored in Glacier as fast as possible. If no urgency, it's cheaper to restore data to S3 and then S3 select.
+
+Glacier vault lock policy prevents anyone from deleting data in Glacier, and glacier vault access policy prevents access. But this only applies to data in Glacier, so if you're dealing with lifecycle rules, make sure to copy data to Glacier from day 1, and then with lifecycle rules move to IA and then delete.
+
+S3 cross region replication: to reduce latency with other regions and to keep the data as up to date as possible
 
 ### 2.2 DynamoDB
 
@@ -571,7 +609,7 @@ Goal: extract structure from unstructured data.
 * Redshift
 * Most other SQL databases
 
-You can create custom ETL jobs (use Spark under the hood, but you don't need to manage it): trigger-driven, on a schedule, on demand...
+You can create custom ETL jobs (use Spark under the hood, but you don't need to manage it): trigger-driven, on a schedule, on demand... min every 5mins
 
 Gloue crawler scans data in S3 and creates schema. It can run periodically. It populates the glue data catalog, stores only the table definition. once catalogued, you can treat your unstructured data as if it was structured. Using Quicksight, we can visualize data.
 
@@ -585,9 +623,7 @@ Glue ETL automatically generates code to transform data, in Scala or python. can
 
 It can provision additional DPUs (data processing unit) to increase performance of underlying spark jobs. you can enable job metrics to know the max. capacity in DPUs that you need. With this, you can change the max. capacity parameter value and set it to a higher number if you want the job to finish faster.
 
-Job bookmark maintains state information and prevents glue from reprocessing old data, so you can stop the job at some point and then resume it from that point, not from the beginning.
-
-
+Job bookmark maintains state information, so you can stop the job at some point and then resume it from that point, not from the beginning. It also  **prevents glue from reprocessing old data**, so once data has been processed in one job run, it won't be processed again.
 
 Glue ETL can: transform, clean, enrich data before doing analysis. It generated code in python/scala, and you can modify the code to tune it to your usecases. You can also provide your own code in Spark or PySpark scripts.
 
@@ -657,6 +693,8 @@ if we want custom naming in the S3 bucket, we have to create a Table in Glue, an
 Glue can crawl data in different regions, when you define a S3 datastore to crawl, you choose whether to crawl a path in your account or another account.
 
 A classifier reads the data in a data store, if it recognizes the format of the data, it generates a schema. classifier also returns a certainty number to indicate how certain the format recognition was. glue provides built-in classifiers, but you can create custom ones too. glue invokes custom classifiers furst. if a classifier returns certainty=1.0, then it's 100% certain that it can create the correct schema. if no classifier returns certainty=1.0, glue uses the output of the classifier with the highest certaints, and if no classifier returns a certainty higher than 0.0, glue returns the default classification string of UNKNOWN.
+
+Glue can connect to Athena, Redshift, Hive and Quicksight, and can be used as a Hive metastore.
 
 ### 3.2 Lake formation
 
@@ -745,11 +783,28 @@ EMR provides managed scaling, supports scaling in instance groups and instance f
 
 > Security
 
-EMRFS has S3 encryption, TLS in transit between EMR nodes and S3, also local disk encryption, spark communication between drivers & executors is encrypted, hive communication between Glue Metastore and EMR uses TLS
+* You can use EC2 key pair for SSH credentials
+* You can add IAM roles to EC2 for proper S3 access, EMRFS requests to S3, DynamoDB scans through Hive
+* EC2 security groups: one for master node, another for cluster node. Security groups allow node-to-node communication
+* For authentication, Kerberos is used
+
+Encryption:
+
+* EMRFS encryption
+  * S3 encryption at rest: sse-s3, sse-kms, client-side. ss3-c not supported
+  * At-rest-data encryption for local disks
+    * Open-source HDFS encryption
+    * EC2 instance store encryption, NVMe or LUKS encryption
+    * EBS volumes: KMS (works with root volume), LUKS (doesn't work with root module)
+  * TLS in transit between EMR nodes and S3
+* spark communication between drivers & executors is encrypted
+* hive communication between Glue Metastore and EMR uses TLS
 
 > Hadoop
 
 * MapReduce: framework for distributed data processing, maps data to key-value pairs. Reduces intermediate results to final output. Supplanted by Spark
+  * Ganglia can be used for monitoring cluster's performance as a whole and with individual nodes
+  * To make MapReduce jobs be more efficient, use AVRO to compress and then uncompress files into 64MB chunks, which is the default HDFS chunk size.
 * YARN: Yet Another Resource Negotiator: manages cluster resources for data processing frameworks
 * HDFS: Hadoop distributed file system: distributes data blocks across cluster in a redundant manner. Ephemeral in EMR.
 
@@ -812,7 +867,13 @@ Other Hive integrations, you can load table partitions from S3, write tables in 
 
 > Apache Pig
 
-Comes installed in EMR directly. Pig is a solution for writing mappers and reducers faster, with Pig Latin, a scripting language with SQL-like syntax. Highly extensible with user defined functions. It's integrated to S3.
+Comes installed in EMR directly. Pig is a solution for writing mappers and reducers faster, with Pig Latin, a scripting language with SQL-like syntax. Highly extensible with user defined functions.
+
+EMR integration into S3:
+
+* Directly writing to HCatalog in S3
+* Loading custom JAR files from S3 with the REGISTER command
+* Submitting work from the EMR console using Pig scripts stored in S3
 
 > Apache HBase
 
@@ -827,6 +888,12 @@ DynamoDB:
 
 * Fully managed (auto-scaling)
 * More integration with other AWS services, like Glue
+
+EMR can integrate HBase in S3 in the following ways:
+
+* Snapshots of HBase into S3
+* Storage of HBase files and metadata in S3
+* HBase read-replicas in S3
 
 > Presto
 
@@ -902,6 +969,10 @@ Uses for KDA:
 * Continuous metric generation
 * Responsive analytics
 
+Security:
+
+* IAM roles to read from data streams and write to output destination
+
 ### 4.2. Opensearch
 
 Fully managed (no serverless, AWS manages the EC2 but you have to decide how many servers in your clusters, no autoscaling) petabyte-scale analysis and reporting, originally started as search engine. For some types of queries, OS can be faster than Spark. You can create a data pipeline with Kinesis, OS and then Dashboards for visualization. Very storage heavy
@@ -972,6 +1043,8 @@ Remote reindex allows copying indices (not the whole cluster) from one cluster t
 
 Serverless service for interactive queries for S3 (but not from Glacier), data stays in S3. It uses Presto under the hood. Supports these data formats: csv, json, ORC, parquet, avro.
 
+Gzip, Avro are not columnar formats so not suitable for Athena
+
 Good solution for:
 
 * ad-hoc queries of logs for example
@@ -995,7 +1068,7 @@ Athena provides ACID transactions, concurrent users can safely make row-level mo
 
 ### 4.4 Redshift
 
-Fully-managed (not serverless!) petabyte-scale data warehouse for structured data (for unstructured, use ETL on EMR), designed for online analytic processing. Designed for OLAP, not OLTP (transaction, for this use RDS or DynamoDB). It can scale up and down on demand, and has built-in replication and backups.
+Fully-managed (not serverless!) petabyte-scale data warehouse for structured data (for unstructured, use ETL on EMR), designed for online analytic processing. Designed for OLAP, not OLTP (transaction, for this use RDS or DynamoDB). It can scale up and down on demand, and has built-in replication and backups. Doesn't provide low latency.
 
 The cluster is composed of the leader node, connecting to the client via JDBC/ODBC, and the compute nodes.
 
@@ -1014,7 +1087,8 @@ Key points:
 * Automatic async replicated to another region
 * Automated snapshots
 * Failed nodes or drivers are automatically replaced
-* However, Redshift is limited to one AZ.
+* **However, Redshift is limited to one AZ**
+  * To maintain a read-replica in another AZ, spin up separate clusters in 1+AZs using Kinesis to simultaneously write data into each cluster. Use Route53 to direct your analytic tools to the nearest cluster when querying your data
 * Scaling is done vertically and horizontally on demand, but with downtime.
   * A new cluster is created and the old on remains availabla as read. then the CNAME flipped to new cluster (downtime), then data moved in parallel to the new cluster.
 
@@ -1030,6 +1104,7 @@ Sort keys. Similar to indices. When storing data on disk, rows are stored in sor
 Importing / exporting data:
 
 * COPY: parallel command to load files from S3/EMR/DynamoDB into Redshift
+  * Try to have as few COPY commands as possible, and file sizes no more than 1GB each, ideally with compression.
   * This command adds hidden metadata columns
   * This command can also decrypt data as it's loadad from S3
   * Compression is supported to speed it up even more
@@ -1046,7 +1121,7 @@ To copy a snapshot from a KMS-encrypted cluster in another region for backup, th
 3. Specify KMS key ID for which you're creating the copy grant
 4. In the source region, enable copying of snapshots to the copy grant created above
 
-With DBLINK, Redshift can be connected to PostgreSQL and enable copying and syning data between PostgreSQL and Redshift.
+With **DBLINK**, Redshift can be connected to PostgreSQL and enable copying and syning data between PostgreSQL and Redshift.
 
 Redshift workload management: prioritize short, fast queries vs. long, slow queries. You can also create query queues.
 
@@ -1064,6 +1139,8 @@ Redshift clusters can be resized:
 
 Security:
 
+* Encryption at rest using KMS or an HSM device, in which case you have to establish a connection
+* Encryption in-flight using the JDBC driver enabled with SSL
 * When using Hardware security module, you must use client + server certificate to configure a trusted connection
   * If you migrate an unencrypted cluster to an HSM-encrypted cluster, you must create the new encrypted cluster and then move data to it
 * You can define access privileges for users or groups, with grant or revoke commands in sql
@@ -1073,7 +1150,6 @@ Redshift serverless:
 * Automatically scale and provision for your workload
 * Uses ML to maintain performance across variable and sporadic workloads
 * Spectrum, public endpoints not supported
-* 
 
 To ccreate external tables, define the structure for files and register them as tables in glue data catalog.
 
@@ -1081,9 +1157,9 @@ To ccreate external tables, define the structure for files and register them as 
 
 ### 5.1. Quicksight
 
-Serverless tool for business analysts to analzye and visualize data, perform ad-hoc analysis. Allows creating dashboards and contains limited ETL. For more ETL, use Glue/Spark.
+Serverless tool for business analysts to analzye and visualize data, perform ad-hoc analysis. Allows creating dashboards and contains limited ETL. For more ETL, use Glue/Spark. Not meant for use in the public.
 
-Data sources: Redshift, Aurora/RDS, Athena, EC2-hosted dbs, Files (on-prem, s3).
+Data sources: Redshift, Aurora/RDS, Athena, EC2-hosted dbs, Files (on-prem, excel, s3).
 
 SPICE, super-fast parallel in-memory calculation engine, is used to accelerate interactive queries on large datasets. Each user gets 10GB of SPICE, it's highly available, durable, scalable to many users.
 
@@ -1107,7 +1183,76 @@ ML:
 * Random cut forest can find anomalies, outliers in the dataset
 * Random cut furest It can also do forecasting, detect seasonality and trends
 * Autonarratives, adds "story of your data" to your dashboard
-* Suggested insight: A new tab displays ready-to-use suggested insights.
+* Suggested insight: A new tab displays ready-to-use suggested insights
+
+Quicksight Q is a tool to allow users to query with NLP, offered as add-on in some regions. To use this, you have to set up topics associated to datasets. Datasets and the fields  must be NLP-friendly.
+
+Visualization types:
+
+* AutoGraph: selects the visualization automatically
+* Bar charts, for comparison and distribution. histogram
+* Line graphs, for changes over time
+* Scatter plots: for correlation
+* Heat map: like pivot tables that highlight outliers and trends
+* Pie graphs, tree maps: for aggregation, to see how much percentage each section has, like a cake
+* Pivot tables: for tabular data
+
+For public facing interactive charts and dashboards, write data into S3, enable Cloudfront, and use Highcharts or d3.js to visualize the data on the web.
+
+## 6. Security
+
+3 methods for encrypting objects in S3:
+
+* SSE-S3: objects are encrypted using keys handled and managed by S3
+  * AES-256 encryption type, must set header "x-amz-server-side-encryption": "AES256"
+* SSE-KMS: keys managed by KMS
+  * Advantages: user control and audit trail. Header: "x-amz-server-side-encryption": "aws:kms"
+* SSE-C: client manages their own keys
+  * Encryption is done in S3, but key is not stored in S3, you need encryption in transit using HTTPS
+  * Encryption key must be provided in HTTP headers for every HTTP request made
+* Client side encryption
+  * You encrypt objects before uploading to S3, and decrypt when retrieving from S3
+  * Client manages the keys and encryption cycle completely
+
+S3 exposes HTTP endpoint, non encrypted, and HTTPS endpoint, with encryption in flight. this is recommended.
+
+### 6.1. KMS
+
+Manages and rotates keys, but only up to 4kb of data per call. If data is bigger, use envelope encryption. Supports symmetric and asymmetric encryption.
+
+3 types of customer master keys (CMK)
+
+* AWS managed CMK: free
+* User keys created in KMS: $1/mo
+* User keys imported: $1/mo
+
+You also pay for API calls to KMS
+
+S3 allows in-place encryption on the fly, other services like EBS, EFS, RDS, Elasticache, need snapshot/backup to be able to encrypt it.
+
+Automatic key rotation is possible only for customer-managed CMK. If enabled, it rotates keys every year, old key is kept alive so you can decrypt old data. New key has the same CMK ID, only the backing key is changed.
+
+You can also rotate keys manually, whenever you want. in this case new key has different CMK ID. Previous key is also kept alive. You should use alias to hide the change of key for the app.
+
+### 6.2. CloudHSM
+
+AWS provisions the hardware (HSM = hardware security module), but you have to use your own client to perform the encryption. You manage your own encryption keys entirely. Supports both symmetric and asymmetric encryption, multiAZ can be enabled.
+
+Redshift supports CloudHSM. CloudHSM is a good option for SSE-C encryption.
+
+### 6.3. STS
+
+Security token service, allows to grant limited and temporary access to AWS resources. Token is valid for up to 1h
+
+Allows cross-account access:
+
+1. Define IAM role for another account to access
+2. Define which accounts can access this role
+3. use STS to retrieve credentials and assume the role that you have access to
+
+Also supports federation, users outside of AWS get temporary role to access AWS resources: AD, SAML, SSO, Cognito
+
+
 
 ---
 
