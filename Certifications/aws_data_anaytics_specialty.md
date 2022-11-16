@@ -17,8 +17,9 @@
     - [1.4 Data migration](#14-data-migration)
     - [1.5 MSK](#15-msk)
   - [2. Storage](#2-storage)
-    - [2.1 S3](#21-s3)
-    - [2.2 DynamoDB](#22-dynamodb)
+    - [2.1 File formats](#21-file-formats)
+    - [2.2 S3](#22-s3)
+    - [2.3 DynamoDB](#23-dynamodb)
   - [3. Processing](#3-processing)
     - [3.1 Glue](#31-glue)
     - [3.2 Lake formation](#32-lake-formation)
@@ -170,7 +171,6 @@ If bad performance on write, use random partition keys, and update shard count. 
 * Firehose is near-real-time, min 60s latency
 * Can read up to 1MB
 * All failed data, source records, transformation failures, can go to another S3 bucket
-* Spark/HCL cannot read from KDF, only from data stream #TODO
 
 Producers:
 
@@ -190,23 +190,20 @@ Destinations
 
 Firehose accumulates records in a buffer, which is flushed based on time and size rules. If size, if you make the rule of 32mb, then if that buffer size is reached, it's flushed. for time, if you set 2mins, it's flushed every 2mins. It can automatically increase the buffer size to increase throughput. For high throughput scenarios, use buffer size limit. For low throughput, use buffer time limit.
 
-Differences with data stream
-
-#TODO make table, research more differences
-
-* Data stream, you have to write custom code for producer and consumer
-  * Firehose: fully managed
-* Data stream is real time (200ms for classic, 70ms for enhanced fanout)
-  * Firehose: near real-time, min. 1min
-* Data stream, you must manage scaling yourself
-  * Firehose: automatic scaling
-* Data streams, has a configurable data rentention of between 1 and 365 days
-  * Firehose: 24h data retention
+| Stream                                        | Firehose                                                 |
+| --------------------------------------------- | -------------------------------------------------------- |
+| Managed service but shards need configuration | Fully managed                                            |
+| Real-time                                     | Near real-time                                           |
+| 200ms latency for normal, 70ms for enhanced   | min buffer time 60s                                      |
+| Data retention from 1 to 35 days              | No data retention                                        |
+| Manual scaling                                | Automatic scaling                                        |
+| Supports replay                               | No support for replay                                    |
+| Prod: Agent, SDK, KPL                         | Prod: Stream, DirectPUT                                  |
+| Cons: Analytics, Firehose, KCL, Lambda        | S3, Redshift, Opensearch, HTTP endpoint, Splunk, MongoDB |
 
 Security:
 
-* IAM roles can deliver data to S3, ES, Redshift, Splunk
-* Can encrypt delivery stream with KMS, server-side encryption
+* Server-side encryption supported with KMS
 * VPC endpoints supported
 
 ### 1.2 SQS
@@ -224,15 +221,7 @@ Secure, durable and available hosted queue to integrate and decouple distributed
   * Exactly once processing, no duplicates
   * First in first out messages delivery
 
-Data retention is 3 days default, max 14 days. Low latency, <10ms on publich and receive. message size is 256kb max.
-
-Consumers receive records from SQS, process them and delete them afterwards.
-
-> SQS vs. kinesis
-
-* SQS for order, image processing. good for decoupling front and backend, and it can only received by one consumer. highly scalable, data deleted after read, capable of delaying messages
-* SQS max object size is 256kb (more if using extended lib), KDS is  1MB, and KDF is 128MB at destination
-* Kinesis streams for fast log and data intake and processing, real-time metrics and reporting, real-time data analytics, complex stream processing. read and replays records in same order, many apps can read from the same kinesis data stream, 1MB payload, data deleted after retention period, ordering of records is preserved at shard level, provisioned vs. on-demand mode with replay capability
+Data retention is 3 days default, max 14 days. Low latency, <10ms on publich and receive. message size is 256kb max. SQS only allows one consumer.
 
 Security:
 
@@ -266,7 +255,6 @@ Security:
   * Useful when you have an on-prem db and you want a read replica, which can't be instantiated from an on-prem db. Use DMS to migrate db to RDS or similar
 * Storage gateway: hybrid storage that connects on-prem to AWS. ideal for backup, bursting, tiering, migration
 * Data sync: 5x faster file transfers than open source tools, good for migration data into EFS or moving between cloud file systems
-* S3 transfer acceleration: fast transfers in and out of s3, ideal when working with long geographic distances
 * Direct connect (DX): private connection between on-prem and aws with dedicated fiber optic, no ISP provider required. increased bandwidth
   * dedicated connection: 1Gbps, until 100Gbps
   * hosted connection: 50Mbps, until 10GBps if you order from approved aws direct connect partners
@@ -282,24 +270,20 @@ Security:
 
 * [Kinesis & Kafka for fraud detection workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/ad026e95-37fd-4605-a327-b585a53b1300/en-US)
 
-Managed Streaming for Apache Kafka is a service that uses fully managed Apache Kafka to ingest and process streaming data in real time. It's an alternative to kinesis, default message size is 1MB but it can be configured to send larger messages, like 10MB (as opposite to kinesis)
+Managed Streaming for Apache Kafka is a service that uses fully managed Apache Kafka to ingest and process streaming data in real time. It can only span 1 region, in several AZs.
+
+> MFK vs. Kinesis data streams
+
+* KDS 1MB message size limit, MFK 1MB default but can get higher
+* Data streams with shards, kafka topics with partitions
+* KDS shard splitting and merging, MSK can only add partitions to a topic
+* KDS TLS in-flight encryption, MSK plaintext or TLS in-flight encryption
 
 Producers write to the cluster (you have to write code for this), then the data gets written to the topic and replicated into the other topics, and then consumers poll from topic (write code)
 
 The MSK cluster is composed of keeper and broker, broker is where you keep partitions. in kinesis stream we have streams and shards, in kafka we have topics and partitions.
 
-![ ](img/aws_data_analytics_specialty/kafka1.jpg)
-
-![ ](img/aws_data_analytics_specialty/msk_kinesis.jpg)
-
-> Configuration
-
-* Choose number of AZs, recommended 3, or 2
-* Choose VPC and subnets
-* Choose broker instance type, number of brokers per AZ
-* Size of EBS volumes
-
-security:
+Security:
 
 * Optional in flight encryption using TLS between brokers, and between clients and brokers
 * KMS for EBS for at encryption rest
@@ -331,46 +315,39 @@ MSK serverless: for intermittent non-constant workloads, no need to manage or sc
 MSK connect (like consumer) works with other 3rd party services, we can use plugin. you can deploy any kafka connect connectors to MSK connect as plugin like S3, redshift, openserach.
 SK connect workers can poll topic data from SMK cluster, and write to S3. No need to manage infrastructure.
 
-Source connectors can be used to import data from external systems into your topics. with sink connectors, you can eport data from your topics to external systems.
-
-amazon managed streaming for apache kafka (cluster) can only span 1 region, in several AZs.
+Source connectors can be used to import data from external systems into your topics. with sink connectors, you can export data from your topics to external systems.
 
 more info: https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.html
 
-> MFK vs. Kinesis data streams
-
-* KDS 1MB message size limit, MFK 1MB default but can get higher
-* Data streams with shards, kafka topics with partitions
-* KDS shard splitting and merging, MSK can only add partitions to a topic
-* KDS TLS in-flight encryption, MSK plaintext or TLS in-flight encryption
-
 ## 2. Storage
 
-### 2.1 S3
+### 2.1 File formats
 
-* S3 latency is between 100-200ms
-* Min. 3.5k put/copy/post/delete
-* 5.5k get/head requests per second per prefix per bucket
+* Parquet
+  * max recommended file size: 250MB
+  * good practice to have fewer, bigger parquet files. it improves performance because you only open the file once
+  * Good option to compress JSON
+* ORC
+  * Good option to compress JSON
+* Avro
 
-Prefix is the object path in s3, so we get that performance per folder
+### 2.2 S3
 
-With access points, create one access point per prefix, and grant access to different IAM groups to different prefixes in S3
+* Latency is between 100-200ms
+* Min. 3.5k put/copy/post/delete and 5.5k get/head requests per second per prefix per bucket
+* now has strongly consistency for all operations
+* Access point: you can create unique access control policies for each access point to easily control access to shared datasets or different prefixes in the bucket
+* S3 object Lambda: you can change the objects before it's retrieved by the caller application, without creating another object. for that, we need 1 bucket, an access point and an object lambda access point
+* cross region replication: to reduce latency with other regions and to keep the data as up to date as possible
 
-With S3 object Lambda, you can change the objects before it's retrieved by the caller application, without creating another object. for that, we need 1 bucket, an access point and an object lambda access point.
+> Glacier
 
-S3 now has strongly consistency for all operations.
+* Glacier Select: to query cold data stored in Glacier as fast as possible. If no urgency, it's cheaper to restore data to S3 and then S3 select
+* Glacier vault lock policy prevents anyone from deleting data in Glacier, and glacier vault access policy prevents access. But this only applies to data in Glacier, so if you're dealing with lifecycle rules, make sure to copy data to Glacier from day 1, and then with lifecycle rules move to IA and then delete.
 
-Glacier Select: to query cold data stored in Glacier as fast as possible. If no urgency, it's cheaper to restore data to S3 and then S3 select.
+### 2.3 DynamoDB
 
-Glacier vault lock policy prevents anyone from deleting data in Glacier, and glacier vault access policy prevents access. But this only applies to data in Glacier, so if you're dealing with lifecycle rules, make sure to copy data to Glacier from day 1, and then with lifecycle rules move to IA and then delete.
-
-S3 cross region replication: to reduce latency with other regions and to keep the data as up to date as possible.
-
-To compress json data in s3, use parquet or ORC format. max recommended file size for parquet is 250MB. merging small parquet files into one big parquet file improved performance, because you only open the file once. good practice to have less, bigger parquet files.
-
-### 2.2 DynamoDB
-
-* provisioned capacity: specify rcu and wcu, the throughput for reads and writes. if you go over, you can access a temporary burst capacity, but if you exceed that, you will get error "ProvisionedThroughputExceededException"
+* provisioned capacity: needs to specify rcu and wcu. if you go over, you can access a temporary burst capacity, but if you exceed that, you will get "ProvisionedThroughputExceededException"
   * Burst capacity only lasts for 300s
   * This error can come from exceeding provisioned rcu and wcu, or because of hot keys (one partition key being read too many times, for popular items), hot partitions, or very large items
   * To fix: exponential backoff, distribute partition keys and if rcu is an issue, use DAX
@@ -393,7 +370,7 @@ for reading, 2 options: strongly(2x rcu) and eventually consistency. For consist
 
 > Read operations
 
-* GetItem returns eventual reads by default, you can use projection expression to retrieve only certain attributes.
+* GetItem returns eventual reads by default, you can use projection expression to retrieve only certain attributes
 * Query returns items based on a specific partition key
   * KeyConditionExpression, partition key and sort key
   * FilterExpression: additional filtering after the query operation (before data is returned to you). use only with non-key attributes (no hash or range attributes)
@@ -455,7 +432,7 @@ dax vs. elasticache
 > backup
 
 * on demand: backups remain forever, even after table is deleted
-  *  create full backups of your tables for long-term retention and archival for regulatory compliance needs.
+  *  create full backups of your tables for long-term retention and archival for regulatory compliance needs
 * point in time recovery
   * helps to protect your DynamoDB tables from accidental write or delete operations
   * you can restore that table to any point in time during the last 35 days
@@ -482,6 +459,13 @@ More in-depth information about DynamoDB in the [DynamoDB Lab](https://amazon-dy
 
 Glue ETL is for compressing, partitioning, transforming raw data into columnar (more efficient than row-based) data format.
 
+* Glue data catalog: persistent metadata store. You can store, annotate, share metadata. 1 data catalog per region allowed
+* Glue database: a set of associated data catalog table definitions organized into a logical group
+* Table: metadata definition that represents your data. The data resides in its original store, this is just a representation of the schema
+* Glue crawler: a program that connects to a data store (source or target), progresses through a prioritized list of classifiers to determine the schema for the data, and then creates metadata tables in glue data catalog
+
+Folders where data is stored on S3 (sales/year=2019/month=1/day=1) are mapped to partitions, i.e. columns in the glue table
+
 **Serverless** discovery and definition of table definitions and schema. Central metadata repository for your datalake. Discover schemas from your unstructured data and publsish table definitions.
 
 Goal: extract structure from unstructured data.
@@ -507,9 +491,7 @@ It can provision additional DPUs (data processing unit) to increase performance 
 
 Job bookmark maintains state information, so you can stop the job at some point and then resume it from that point, not from the beginning. It also  **prevents glue from reprocessing old data**, so once data has been processed in one job run, it won't be processed again.
 
-Glue ETL can: transform, clean, enrich data before doing analysis. It generated code in python/scala, and you can modify the code to tune it to your usecases. You can also provide your own code in Spark or PySpark scripts.
-
-Target of Glue ETL can be S3, RDS, Redshift or Glue data catalog.
+*Glue ETL* can: transform, clean, enrich data before doing analysis. It generates code in python/scala, and you can modify the code to tune it to your usecases. You can also provide your own code in Spark or PySpark scripts. Target of Glue ETL can be S3, RDS, Redshift or Glue data catalog. Simple ETL, can be used for schema conversion (json->parquet), or finding records matches.
 
 By using DynamocFrameWriter class in Glue, you can replace the existing rows in the Redshift table before persisting the new data, thus avoiding dubplicates
 
