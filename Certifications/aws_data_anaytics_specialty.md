@@ -50,7 +50,7 @@ Streaming service. Kinesis types:
 * **Kinesis Stream**: is real-time, 200ms latency. provides storage. good for low-latency reqs
 * **Kinesis Firehose**: near real-time, no storage good for: iot, clickstream analytics, log analytics, security monitoring
   * Easiest way to dump streaming data into aws
-  * Minimum latency 60s, max size 1KB (#TODO check this)
+  * Minimum latency 60s, max size 1KB
   * built-in integration with s3 and other services
   * built-in lambda capability for data transform
 * **Kinesis data analytics**: real-time analytics on the streaming data
@@ -195,6 +195,7 @@ Firehose accumulates records in a buffer, which is flushed based on time and siz
 | Managed service but shards need configuration | Fully managed                                            |
 | Real-time                                     | Near real-time                                           |
 | 200ms latency for normal, 70ms for enhanced   | min buffer time 60s                                      |
+| Max data blob: 1MB                            | Max data blob: 1KB                                       |
 | Data retention from 1 to 35 days              | No data retention                                        |
 | Manual scaling                                | Automatic scaling                                        |
 | Supports replay                               | No support for replay                                    |
@@ -254,7 +255,7 @@ Security:
   * With Schema conversion tool, you can convert the db schema from one engine to another
   * Useful when you have an on-prem db and you want a read replica, which can't be instantiated from an on-prem db. Use DMS to migrate db to RDS or similar
 * Storage gateway: hybrid storage that connects on-prem to AWS. ideal for backup, bursting, tiering, migration
-* Data sync: 5x faster file transfers than open source tools, good for migration data into EFS or moving between cloud file systems
+* Data sync: 5x faster file transfers than open source tools, good for migration data into AWS storage services or moving between cloud file systems
 * Direct connect (DX): private connection between on-prem and aws with dedicated fiber optic, no ISP provider required. increased bandwidth
   * dedicated connection: 1Gbps, until 100Gbps
   * hosted connection: 50Mbps, until 10GBps if you order from approved aws direct connect partners
@@ -452,119 +453,72 @@ More in-depth information about DynamoDB in the [DynamoDB Lab](https://amazon-dy
 
 ### 3.1 Glue
 
-#TODO review https://docs.aws.amazon.com/glue/index.html
-
+* [AWS documentation](https://docs.aws.amazon.com/glue/index.html)
 * [Glue studio workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/71b5bdcf-7eb1-4549-b851-66adc860cd04/en-US)
 * [Glue workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/aaaabcab-5e1e-4bff-b604-781a804763e1/en-US)
 
-Glue ETL is for compressing, partitioning, transforming raw data into columnar (more efficient than row-based) data format.
+Glue is a serverless service that discovers and connects to diverse data sources (S3 data lakes, RDS, Redshift, most othe SQL databases) and manage your data in a centralized *data catalog* or Hive metastore, which is a persistent metadata store composed of many tables. You can visually create, run, and monitor ETL pipelines to load data into your data lakes. Also, you can immediately search and query cataloged data using Amazon Athena, Amazon EMR, and Amazon Redshift Spectrum.
 
-* Glue data catalog: persistent metadata store. You can store, annotate, share metadata. 1 data catalog per region allowed
-* Glue database: a set of associated data catalog table definitions organized into a logical group
-* Table: metadata definition that represents your data. The data resides in its original store, this is just a representation of the schema
-* Glue crawler: a program that connects to a data store (source or target), progresses through a prioritized list of classifiers to determine the schema for the data, and then creates metadata tables in glue data catalog
+Hive is a service for running sql-like queries from EMR. the Data catalog can serve as a Hive metastore, and also, you can import a hive metastore into glue.
 
-Folders where data is stored on S3 (sales/year=2019/month=1/day=1) are mapped to partitions, i.e. columns in the glue table
+Only 1 data catalog per region allowed.
 
-**Serverless** discovery and definition of table definitions and schema. Central metadata repository for your datalake. Discover schemas from your unstructured data and publsish table definitions.
+> Glue crawler
 
-Goal: extract structure from unstructured data.
+Glue crawler is a program that populate the AWS Glue Data Catalog or Hive metastore with tables (cannot be used for DynamoDB, RDS). It connects to a data store, progresses through a prioritized list of classifiers to determine the schema for the data, and then creates metadata tables or updates existing tables in glue data catalog. Once catalogued, you can treat your unstructured data as if it was structured. The data is still in the data store, Glue only stores the table definition.
 
-* S3 data lakes
-* RDS
-* Redshift
-* Most other SQL databases
+A classifier reads the data in a data store, if it recognizes the format of the data, it generates a schema. classifier also returns a certainty number to indicate how certain the format recognition was. glue provides built-in classifiers, but you can create custom ones too and if yo do, they are invoked first. if a classifier returns certainty=1.0, then it's 100% certain that it can create the correct schema. if no classifier returns certainty=1.0, glue uses the output of the classifier with the highest certainty, and if no classifier returns a certainty higher than 0.0, glue returns the default classification string of UNKNOWN.
 
-You can create custom ETL jobs (use Spark under the hood, but you don't need to manage it): trigger-driven, on a schedule, on demand... min every 5mins
+Glue crawler extracts partitions based on how the S3 data is organized. e.g. if you have sensor data from devices every hour, you can a) query primarily by time range? then organize your buckets as yyyy/mm/dd/device. b) if you can query primarily by device, then organize bucket as device/yyy/... Folders where data is stored on S3 (sales/year=2019/month=1/day=1) are mapped to partitions, i.e. columns in the glue table
 
-Gloue crawler scans data in S3 and creates schema. It can run periodically. It populates the glue data catalog, stores only the table definition. once catalogued, you can treat your unstructured data as if it was structured. Using Quicksight, we can visualize data.
+To do modifications on the data catalog, only works if data catalog is in s3, in format json/csv/parquet/avro. if parquet, special code required. and nested schemas are not supported
 
-Glue crawler extracts partitions based on how the S3 data is organized. e.g. if you have sensor data from devices every hour, you can a) query primarily by time range? then organize your buckets as yyyy/mm/dd/device. b) you can query primarily by device, then organize bucket as device/yyy/...
-
-Glue crawler can be used for glue data catalog or Hive metastore, not for DynamoDB, not for RDS.
-
-Hive lets you run sql-like queries from EMR. the glue data catalog can serve as a Hive "metastore", and also conversely, you can also import a hive metastore into glue.
-
-Glue ETL automatically generates code to transform data, in Scala or python. can be encrypted at rest or in transit. It can be event driven (by glue triggers) or ran in schedule with glue Scheduler.
-
-It can provision additional DPUs (data processing unit) to increase performance of underlying spark jobs. you can enable job metrics to know the max. capacity in DPUs that you need. With this, you can change the max. capacity parameter value and set it to a higher number if you want the job to finish faster.
-
-Job bookmark maintains state information, so you can stop the job at some point and then resume it from that point, not from the beginning. It also  **prevents glue from reprocessing old data**, so once data has been processed in one job run, it won't be processed again.
-
-*Glue ETL* can: transform, clean, enrich data before doing analysis. It generates code in python/scala, and you can modify the code to tune it to your usecases. You can also provide your own code in Spark or PySpark scripts. Target of Glue ETL can be S3, RDS, Redshift or Glue data catalog. Simple ETL, can be used for schema conversion (json->parquet), or finding records matches.
-
-By using DynamocFrameWriter class in Glue, you can replace the existing rows in the Redshift table before persisting the new data, thus avoiding dubplicates
-
-Glue ETL is fully managed, cost effective, pay only what you use. Jobs are run on a serverless Spark platform.
-
-DynamicFrame is a collection of DynamicRecords, which are self-describing records with a schema. It's like a Spark DF but with more ETL stuff.
-
-* Bundled operations: DropFields, DropNullFields to drop (null) fields, Filter (filter records, extract one part of data), Join, Map (add, delete fields),
-* ML transformations: FindMatchesML: identify duplicate or matching records in your dataset, even when the records don't have a common identifier and no fields match exactly
-* Automatic format conversions: csv, json, avro, parquet, orc, xml
-* Anything Spark can do, Glue ETL can do, e.g. k-means
-* ResolveChoice: deals with ambiguities in a DynamicFrame and returns a new one. for example, two fields in the DF with the same name
-  * make_cols: creates a new column for each type, e.g. price_double (100), price_string("100")
-  * cast: casts all vals to a specified type
-  * make_struct: creates a structure that contains each data type
-  * project: projects every type to a given type, for example project:string
-
----
-
-To do modifications on the data catalog, only works if DC is in s3, in format json/csv/parquet/avro. if parquet, special code required. and nested schemas are not supported
-
-* To update table schema, a) re-ruwn the crawler or use enableUpdateCatalog/updateBehavior from the script
+* To update table schema, a) re-run the crawler or use enableUpdateCatalog/updateBehavior from the script
 * To add new partitions, a) re-run the crawler or use enableUpdateCatalog and partitionKeys options
 * To create new tables, enableUpdateCatalog/updateBehavior with setCatalogInfo enabled
 
----
-
-Glue development endpoints
-
-you can develop ETL script in a notebook, create a ETL job from it using spark and glue, and create an endpoint in a VPC. To access it:
-
-* Apache Zeppelin on local machine
-* Zeppelin ontebook on ec2 (via glue console)
-* Sagemaker notebook
-* Terminal
-* PyCharm professional edition
-* Elastic IPs to access a private endpoint address
-
-Job bookmarks persist state from the job run, and prevents reprocessing of old data. Only process new data when re-running on a schedule. Works with S3 and relational db-s via JDBC if primary keys are in sequential order, and only if data is coming as new rows, not as updating rows.
-
-CloudWatch events: fire a Lambda/SNS notification when ETL succeeds or fails. Invoke EC2 run, send event to Kinesis, activate step function etc.
-
-> Costs
-
-Billed by the second for crawler and ETL jobs. First 1M objects stored and accessed are free for the glue data catalog. development endpoints for developing ETL code, like notebooks, charged by the minute.
-
-> Anti-patterns
-
-To use other ETL engines apart from Spark, like Hive, Pig, etc. use Data Pipeline EMR, not Glue
-
----
-
-Glue ETL supports serverless streaming ETL, it can consume from kinesis or kafka, clean and transform in-flight, and store results in S3 or elsewhere. It runs on spark structured streaming.
-
-Glue studio is a visual interface for ETL workflows. you can create DAGs for complex workflows to transform/sample/join data, to consume from s3/kinesis/kafka/jdbc, and target to s3/glue DC. Visual job dashboard shows overview, status, run times.
-
-Glue databrew is a visual data preparation tool, UI for pre-processing large datasets. It's more specific than glue studio. it's simpler, take a data source, apply transformations, and put output in S3. No for complicated workflows, just for simple transformation. 250 ready-make transformation. It can integrate with KMS (customer master keys only), SSL in transit, IAM, CloudTrail.
-
-visual view of the dataframe with the data sample, simple statistics.
-
-if we want custom naming in the S3 bucket, we have to create a Table in Glue, and then write a glue ETL script to update table partitions every time a new partition comes.
+For tables that should support custom naming, create a new table manually.
 
 Glue can crawl data in different regions, when you define a S3 datastore to crawl, you choose whether to crawl a path in your account or another account.
 
-A classifier reads the data in a data store, if it recognizes the format of the data, it generates a schema. classifier also returns a certainty number to indicate how certain the format recognition was. glue provides built-in classifiers, but you can create custom ones too. glue invokes custom classifiers furst. if a classifier returns certainty=1.0, then it's 100% certain that it can create the correct schema. if no classifier returns certainty=1.0, glue uses the output of the classifier with the highest certaints, and if no classifier returns a certainty higher than 0.0, glue returns the default classification string of UNKNOWN.
+> Glue ETL
 
-Glue can connect to Athena, Redshift, Hive and Quicksight, and can be used as a Hive metastore.
+Glue ETL is a serverless simple ETL service that runs on Spark to compress, partition, convert schema, clean, enrich, find record matches, make complex transformations, before the data arrives in the target, which can be S3, RDS, Redshift or Glue Data Catalog.
+
+It generates code in Python or Scala, and this code can be modified. Your own code in Spark or PySpark scripts can be imported. Only works with Spark, for other frameworks, use EMR
+
+ETL jobs can be event-driven, on demand, on schedule (min every 5mins).
+
+Glue ETL works with DPUs (data processing unit), which can be up and downscaled. With job metrics, you can know the max. capacity in DPUs and change it to a higher number if you want better performance on the ETL job.
+
+Job bookmark persist state from the job run and prevents reprocessing of old data. Works with S3 and relational db-s via JDBC if primary keys are in sequential order, and only if data is coming as new rows, not as updating rows.
+
+ETL capabilities:
+
+* DropFields, DropNullFields to drop null fields, Filter (filter records, extract one part of data), Join, Map (add, delete fields),
+* FindMatchesML: identify duplicate or matching records in your dataset, even when the records don't have a common identifier and no fields match exactly
+* Automatic format conversions: csv, json, avro, parquet, orc, xml
+* Anything Spark can do, Glue ETL can do, e.g. k-means
+* ResolveChoice: deals with ambiguities in a DynamicFrame and returns a new one. for example, two fields in the DF with the same name
+
+Glue ETL supports serverless streaming ETL, it can consume from kinesis or kafka, clean and transform in-flight, and store results in S3 or elsewhere. It runs on spark structured streaming.
+
+> Visual UIs
+
+Glue studio is a visual interface for ETL workflows. you can create DAGs for complex workflows to transform/sample/join data, to consume from s3/kinesis/kafka/jdbc, and target to s3/glue DC. Visual job dashboard shows overview, status, run times.
+
+Glue databrew is a visual data preparation tool for pre-processing large datasets. It's more specific than glue studio but for simple workflows take a data source, apply a transformation from the list of 250 ready-made transformations, and put output in S3. It can integrate with KMS (customer master keys only).
+
+> Costs
+
+* Crawler: billed by the second
+* ETL jobs: billed by the second
+* Glue data catalog: first 1M objects stored and accessed are free
+* development endpoints for developing ETL code, like notebooks: charged by the minute
 
 ### 3.2 Lake formation
 
-Built on top of glue, makes it easy to set up a **secure** data lake. Loads data and monitors data flows, sets up partitions, helps with encryption and managing keys, defines transformation jobs and monitors them. Helps with access control, auditing. Source can be S3, or databases on-prem too.
-
-Lake formation doesn't cost anything, but the underlying services do: Glue, S3, etc.
+High-level service using Glue (to know the schema) and S3 to create **secure** data lakes from S3, on-prem. Loads data and monitors data flows, sets up partitions, helps with encryption and managing keys, defines transformation jobs and monitors them. Supports cross-account access.
 
 Steps in lake formation:
 
@@ -573,86 +527,76 @@ Steps in lake formation:
 3. create s3 bucket for the datalake
 4. register s3 path in LK, grant permissions
 5. create datbase in LK for data catalog, grant permissions
-6. Use blueprint for a workflow (ie database snapshot)
+6. Use blueprint for a workflow (i.e. database snapshot)
 7. Run workflow
 8. Grant SELECT permissions to whoever needs to read it (athena, redshift spectrum etc.)
 
-LK supports cross-account permissions, but recipient must be set up as datalake administrator. You can use aws RAM (resource access manager) for accounts external to your organization. LK doesn't support manifests in Athena or Redshift queries. to encrypt data catalogs in LK, you need IAM permissions on the KMS encryption key. Data permission can be made super specific
+> Security
 
-"Governed Tables" support ACID transactions across multiple tables. You can set up granular access control with row and cell-level security.
+* Supports table-level and column-level data protection
+* For cross-account datalakes, recipients must be set up as datalake administrator
+* You can use aws RAM (resource access manager) for accounts external to your organization
+* LK doesn't support manifests in Athena or Redshift queries
+* To encrypt data catalogs in LK, you need IAM permissions on the KMS encryption key
+* "Governed Tables" support ACID transactions across multiple tables. You can set up granular access control with row and cell-level security
 
-allows cross-account access to data catalog metadata and underlying data. Large orgas use many AWS accounts.. users can use glue etl jobs, to query and join table across multiple accounts and still take advantage of lake formation table-level and column-level data protections. you can share data catalogs with other accounts
+Billing: Lake formation doesn't cost anything, but the underlying services do: Glue, S3, etc.
 
 ### 3.3 EMR
 
 * [EMR developer experience workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/3c29bc13-0f30-42f7-9f97-4ce8e2ef9b17/en-US)
 
-Elastic MapReduce. Managed Hadoop framework on EC2 instances. Includes Spark, HBase, Presto, Flink, Hive etc. You can get involved with Spark much deeper than you can with Glue. in EMR Notebooks you can use your own code to interact with the clusters.
-
-EMR cluster:
+Elastic MapReduce: managed Hadoop framework on EC2 instances for ETL. If one node fails, provisions new nodes. When creating a cluster, specify framework (Spark, Hive...) and apps. EMR is charged by the hour plus for the additional EC2 charges.
 
 * Master node: leader node, manages cluster
   * Tracks status of tasks, monitors cluster health
-  * Single EC" instance
-* Core node: runs tasks and hosts HDFS data
+  * One single EC2 instance
+  * Recommended instance type: m5.xlarge if there are less than 50 nodes
+* Core node: runs tasks and stores data in HDFS
   * Can be scaled up and down, but with some risk
   * Multi-node clusters have at least one core node
+  * Can be resized, to increase processing and HDFS capacity
 * Task node: runs tasks, does not store data
   * Optional node in the cluster
   * No risk of data loss when removing
-  * Good use of spot instances
+  * Suitable for spot instances
+    * If the app is SLA bound and the task node should complete even at on-demand price, then choose "switch to on-demand"
 
----
+Cluster types:
 
-* Transient cluster: will terminate once all steps are complete
-  * Load data, process, store. then shut down. saves money
-* Long-running clusters must be manually terminated
+* Transient cluster
+  * Load data, process, store, then shut down. saves money
+* Long-running clusters
+  * Must be manually terminated. termination protection is on by default
   * Cluster becomes a data warehouse with periodic processing on large datasets
   * Can spin up task nodes using spot instances for temporary capacity
-  * can use reserved instances on long-running clusters to save money
-  * Has termination protection on by default, auto-termination off
-
-Cluster frameworks and apps are specified at cluster launch. You can connect to master node to run jobs directly.
-
-Master node recommended m5.xlarge if less than 50 nodes. Spot instances are a good choice for task nodes, and only use on core & master if you're testing or very cost sensitive, there's a risk of partial data loss. For ML apps, use compute optimized instance.
-
-To grant access to the cluster, add your IP as a TCP inbound rule in the cluster's security group.
-
-If the app is SLA bound and the task node should complete even at on-demand price, then choose "switch to on-demand"
-
-The EMR instances run on EC2, AWS Data Pipeline can be used to schedule and start clusters.
+  * Can use reserved instances on long-running clusters to save money
 
 > Storage options in EMR
 
-* Storage is done in HDFS (hadoop distributed file system). multiple copies are stored across cluster instances for redundancy. HDFS are ephemeral, data is lost when cluster is terminated. It's useful for caching intermediate results with significant random I/O.
-* By using EMRFS, you can access S3 as if it were HDFS, allows persistent storage after cluster termination. S3 is now since 2021 strongly consistent
-* You can use local filesystem for femporary data like buffers or caches
-* EBS for HDFS is possible, but ephemeral. When you terminate a cluster, EMR deletes the EBS volume. EBS volumes can only be attached when launching a cluster. if you manually detach an EBS volume, EMR treats it as a failure and replaces it.
-
-> EMR features
-
-* Pricing: charged by the hour + EC2 charges
-* Provisions new nodes if a core node fails
-* Can add and remove task nodes on the fly
-* Can add and remove core nodes, but with the risk of data loss
-* Can resize a running cluster's core nodes, which increases both processing and HDFS capacity
+* Ephemeral data storage:
+  * HDFS: (Hadoop distributed file system) distributes data blocks across cluster for redundancy. Useful for caching intermediate results with significant random I/O
+  * Local filesystem for buffers, caches
+  * EBS for HDFS: EBS volumes can only be attached when launching a cluster. If you manually detach an EBS volume, EMR treats it as a failure and replaces it.
+* Persistent:
+  * EMRFS: access S3 as if it were HDFS
 
 > Scaling
 
-EMR provides managed scaling, supports scaling in instance groups and instance fleets. Scales spot, on-demand and instances in a savings plan. Available for Spark, Hive, YARN.
+Scaling supported for spot instances, on-demand and those instances in a savings plan. Scaling is available only for Spark, Hive and Yarn (Yet Another Resource Negotiator: manages cluster resources for data processing frameworks)
 
 * Scale-up strategy: first add core nodes, then task nodes, up to max units specified
 * Scale-down strategy: first remove task nodes, then core nodes, no further than min constraints
-* spot nodes always removed before on-demand nodes
+* Spot nodes are always removed before on-demand nodes
 
 > Security
 
-* You can use EC2 key pair for SSH credentials
-* You can add IAM roles to EC2 for proper S3 access, EMRFS requests to S3, DynamoDB scans through Hive
+* For authentication, Kerberos
 * EC2 security groups: one for master node, another for cluster node. Security groups allow node-to-node communication
-* For authentication, Kerberos is used
+  * To get access to the cluster, add your IP as a TCP inbound rule in the cluster's security group
+* Don't grant full access to S3 for the EMR cluster's service role. Instead, attach IAM roles to EMRFS and limit the EMRFS and S3 permissions attached to the service role for the cluster EC2 instances
 
-Encryption:
+> Encryption
 
 * EMRFS encryption
   * S3 encryption at rest: sse-s3, sse-kms, client-side. ss3-c not supported
@@ -661,44 +605,26 @@ Encryption:
     * EC2 instance store encryption, NVMe or LUKS encryption
     * EBS volumes: KMS (works with root volume), LUKS (doesn't work with root module)
   * TLS in transit between EMR nodes and S3
-* spark communication between drivers & executors is encrypted
-* hive communication between Glue Metastore and EMR uses TLS
-
-> Hadoop
-
-* MapReduce: framework for distributed data processing, maps data to key-value pairs. Reduces intermediate results to final output. Supplanted by Spark
-  * Ganglia can be used for monitoring cluster's performance as a whole and with individual nodes
-  * To make MapReduce jobs be more efficient, use AVRO to compress and then uncompress files into 64MB chunks, which is the default HDFS chunk size.
-* YARN: Yet Another Resource Negotiator: manages cluster resources for data processing frameworks
-* HDFS: Hadoop distributed file system: distributes data blocks across cluster in a redundant manner. Ephemeral in EMR.
+* Spark communication between drivers & executors is encrypted
+* Hive communication between Glue Metastore and EMR uses TLS
 
 > EMR serverless
 
-Let EMR choose how many worker nodes it needs, they are provisioned as needed, automatically.
-
-* Choose EMR release and runtime (spark, hive, presto)
-* Submit queries/scripts via job run requests
-* Underlying capacity managed by EMR
-  * But you can specify default worker sizes and pre-initialized capacity
-  * EMR computes resources needed for jobs and schedules workers accordingly
-  * All within one region, across many AZs
+Automatic provisioning of workers, amount and scheduling for jobs. You can specify default worker sizes and pre-initialized capacity. Only one region supported. Choose EMR release and runtime (spark, hive, presto) and submit queries/scripts via job run requests
 
 To use EMR serverless:
 
 1. IAM user
-2. Use aws cli for steup
-3. Set up job execution role, allow emr-serverless service, s3 access, glue access, kms keys
+2. Use aws cli to set up job execution role, allow emr-serverless service, s3 access, glue access, kms keys
 4. Create EMR serverless app
 5. Add job (e.g. spark script, hive query) within this app
 6. Obtain outputs and logs
 
-EMR serverless app lifecycle: creating, created. starting, started. stopping, stopped. terminated. To go to the next step, API calls need to be made
-
-EMR_S has pre-initialized capacity, spark adds 10% overhead to memory requested for drivers and executors. Be sure that initial capacity is at least 10% more than requested by the job.
+EMR serverless app lifecycle: creating, created. starting, started. stopping, stopped. terminated. To go to the next step, API calls are made.
 
 > Spark
 
-Distributed processing framework for big data
+Distributed processing framework for big data. Allows more depth into Spark than Glue (which is serverless)
 
 * Has in-memory caching, optimized query execution
 * Supports Java, Scala, Python and R
@@ -723,7 +649,7 @@ Spark can also be integrated with Redshift, it allows spark datasets from redshi
 
 Interface to do SQL on unstructured data sitting in EMR. It uses HiveQL, similar to SQL, it's interactive, it's scalable, easy OLAP queries, highly optimized, highly extensible. It's the most appropriate way for data warehouse application, more comfortable than Spark.
 
-By default, Hive records metastore info in a MySQL on the master node's filesystem. if you want the metastore to persist, you must create an external metastore existing outside the cluster. Also to have a centralized metastore in Hive, you have to use an external service, like Glue Data Catalog, or RDS or Aurora.
+By default, Hive records metastore info in a MySQL (sql syntax) on the master node's filesystem. if you want the metastore to persist, you must create an external metastore existing outside the cluster. Also to have a centralized metastore in Hive, you have to use an external service, like Glue Data Catalog, or RDS or Aurora.
 
 Hive maintains a "metastore" that imparts a structure you define on the unstructured data stored on HDFS for instance. By default, the metastore is stored in MySQL on the master node, but external metastores offer better resiliency/integration if the cluster shuts down, e.g. glue data catalog (equivalent to hive metastore, but external metastore for hive) or RDS.
 
@@ -788,6 +714,14 @@ Deep learning on EMR
 > S3DistCP
 
 Tool for copying large amounts of data S3 <-> HDFS
+
+> Other
+
+in EMR Notebooks you can use your own code to interact with the clusters.
+
+* Ganglia can be used for monitoring cluster's performance as a whole and with individual nodes
+* To make MapReduce jobs be more efficient, use AVRO to compress and then uncompress files into 64MB chunks, which is the default HDFS chunk size
+
 
 ### 3.4 Data pipeline
 
@@ -934,6 +868,8 @@ Athena provides ACID transactions, concurrent users can safely make row-level mo
 
 ### 4.4 Redshift
 
+column level grant and revoke to help meet security and compliance requirements
+
 Fully-managed (not serverless!) petabyte-scale data warehouse for structured data (for unstructured, use ETL on EMR), designed for online analytic processing. Designed for OLAP, not OLTP (transaction, for this use RDS or DynamoDB). It can scale up and down on demand, and has built-in replication and backups. Doesn't provide low latency.
 
 The cluster is composed of the leader node, connecting to the client via JDBC/ODBC, and the compute nodes.
@@ -1044,7 +980,7 @@ Quicksight can only access data stored in the same region as Redshift. If they'r
 
 Pricing:
 
-Enterprise is double as standard, and it's paid per user per month. Extra Spice capacity can be acquired too. Enterprise includes encryption at rest and microsoft AD integration.
+Enterprise is double as standard, and it's paid per user per month. Extra Spice capacity can be acquired too. Enterprise includes encryption at rest with AWS managed key and microsoft AD integration.
 
 ML:
 
@@ -1127,3 +1063,4 @@ Also supports federation, users outside of AWS get temporary role to access AWS 
 ---
 
 #TODO OLAP (analytics) vs. OLTP? OLTP for transaction, row-based
+OLTP (for thousands of transactions per second), OLAP (longer-live queries that take longer), for analysis
