@@ -325,12 +325,20 @@ more info: https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.htm
 ### 2.1 File formats
 
 * Parquet
+  * Columnar format for Hadoop, stores nested data structures
+  * compressed and splittable
   * max recommended file size: 250MB
   * good practice to have fewer, bigger parquet files. it improves performance because you only open the file once
   * Good option to compress JSON
+  * Good for improving queries for tables
 * ORC
+  * compressed and splittable
   * Good option to compress JSON
+  * columnar, good for improving queries for tables
 * Avro
+  * row-based format for Hadoop
+  * Stores in JSON format
+  * To optmize files in Hadoop, use AVRO to compress and then uncompress into 64MB chunks, which is the default HDFS chunk size
 
 ### 2.2 S3
 
@@ -340,6 +348,8 @@ more info: https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.htm
 * Access point: you can create unique access control policies for each access point to easily control access to shared datasets or different prefixes in the bucket
 * S3 object Lambda: you can change the objects before it's retrieved by the caller application, without creating another object. for that, we need 1 bucket, an access point and an object lambda access point
 * cross region replication: to reduce latency with other regions and to keep the data as up to date as possible
+* S3 and S3 one-zone IA have the same read performance
+* to improve read performance, add random string prefixes to objects
 
 > Glacier
 
@@ -546,16 +556,15 @@ Billing: Lake formation doesn't cost anything, but the underlying services do: G
 
 * [EMR developer experience workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/3c29bc13-0f30-42f7-9f97-4ce8e2ef9b17/en-US)
 
-Elastic MapReduce: managed Hadoop framework on EC2 instances for ETL. If one node fails, provisions new nodes. When creating a cluster, specify framework (Spark, Hive...) and apps. EMR is charged by the hour plus for the additional EC2 charges.
+PaaS service for Elastic MapReduce on EC2 instances for ETL. If one node fails, provisions new nodes. When creating a cluster, specify framework (Spark, Hive...) and apps. EMR is charged by the hour plus for the additional EC2 charges.
 
 * Master node: leader node, manages cluster
   * Tracks status of tasks, monitors cluster health
   * One single EC2 instance
   * Recommended instance type: m5.xlarge if there are less than 50 nodes
 * Core node: runs tasks and stores data in HDFS
-  * Can be scaled up and down, but with some risk
+  * Can be scaled up and down to increase processing and HDFS capacity
   * Multi-node clusters have at least one core node
-  * Can be resized, to increase processing and HDFS capacity
 * Task node: runs tasks, does not store data
   * Optional node in the cluster
   * No risk of data loss when removing
@@ -572,13 +581,24 @@ Cluster types:
   * Can spin up task nodes using spot instances for temporary capacity
   * Can use reserved instances on long-running clusters to save money
 
+EC2 instance types, you can only choose one for all nodes in the cluster 
+
+* Instance groups
+  * Only one AZ
+  * Only one instance type per node type: master, core, task
+  * autoscaling provided
+* Instance fleet
+  * choose AZ based on subnet
+  * multiple instance types per node type
+  * no autoscaling
+
 > Storage options in EMR
 
-* Ephemeral data storage:
-  * HDFS: (Hadoop distributed file system) distributes data blocks across cluster for redundancy. Useful for caching intermediate results with significant random I/O
+* Ephemeral data storage
   * Local filesystem for buffers, caches
-  * EBS for HDFS: EBS volumes can only be attached when launching a cluster. If you manually detach an EBS volume, EMR treats it as a failure and replaces it.
-* Persistent:
+  * HDFS (Hadoop distributed file system): distributes data blocks across cluster for redundancy. Useful for caching intermediate results with significant random I/O
+  * EBS for HDFS: EBS volumes can only be attached when launching a cluster. If you manually detach an EBS volume, EMR treats it as a failure and replaces it
+* Persistent
   * EMRFS: access S3 as if it were HDFS
 
 > Scaling
@@ -600,74 +620,51 @@ Scaling supported for spot instances, on-demand and those instances in a savings
 
 * EMRFS encryption
   * S3 encryption at rest: sse-s3, sse-kms, client-side. ss3-c not supported
-  * At-rest-data encryption for local disks
-    * Open-source HDFS encryption
-    * EC2 instance store encryption, NVMe or LUKS encryption
-    * EBS volumes: KMS (works with root volume), LUKS (doesn't work with root module)
+  * EC2 instance store encryption, NVMe or LUKS encryption
+  * EBS volumes: KMS (works with root volume), LUKS (doesn't work with root module)
   * TLS in transit between EMR nodes and S3
 * Spark communication between drivers & executors is encrypted
 * Hive communication between Glue Metastore and EMR uses TLS
 
 > EMR serverless
 
-Automatic provisioning of workers, amount and scheduling for jobs. You can specify default worker sizes and pre-initialized capacity. Only one region supported. Choose EMR release and runtime (spark, hive, presto) and submit queries/scripts via job run requests
+Automatic provisioning of workers, amount and scheduling for jobs. You can specify default worker sizes and pre-initialized capacity. Only one region supported. Choose EMR release and runtime (spark, hive, presto) and submit queries/scripts via job run requests.
 
 To use EMR serverless:
 
 1. IAM user
 2. Use aws cli to set up job execution role, allow emr-serverless service, s3 access, glue access, kms keys
-4. Create EMR serverless app
-5. Add job (e.g. spark script, hive query) within this app
-6. Obtain outputs and logs
+3. Create EMR serverless app
+4. Add job (e.g. spark script, hive query) within this app
+5. Obtain outputs and logs
 
-EMR serverless app lifecycle: creating, created. starting, started. stopping, stopped. terminated. To go to the next step, API calls are made.
+EMR serverless app lifecycle: creating, created. starting, started. stopping, stopped. terminated.
 
 > Spark
 
-Distributed processing framework for big data. Allows more depth into Spark than Glue (which is serverless)
+Distributed processing framework for big data analysis (OLAP). Allows more depth into Spark than Glue (which is serverless)
 
 * Has in-memory caching, optimized query execution
 * Supports Java, Scala, Python and R
 * Supports code reuse across
   * Batch processing
-  * Interactive queries (spark sql)
+  * Interactive queries (sparksql)
   * Real-time analytics
   * ML (MLlib)
   * Graph processing
-* Spark streaming is integrated with kinesis, kafka, on EMR
-* Spark is NOT meant for OLTP (not for thousands of transactions per second), it's for OLAP (longer-live queries that take longer), for analysis
+* Spark streaming can consume from KDS and Kafka
+* Integration with Redshift to do ETL on Redshift directly
+  * Usecase: lots of data in S3, open to Redshift, start a spark cluster on EMR, use that to do ETL and write again to Redshift.
 
 Spark apps are run as independent processes on a cluster. SparkContext (driver program) coordinates them and uses Cluster manager. It sends app code and tasks to executors, which run computations and store data. To run the spark script, do `spark-submit my_script.py`
 
-sparksql is distributed query engine for very fast queries, like jdbc, odbc, json, hdfs, parquet, etc. it gives a sql type interface on top of data
-
-Can be integrated with Kinesis, spark streaming can be a consumer from KDS.
-
-Spark can also be integrated with Redshift, it allows spark datasets from redshift. it's like a spark sql data source. It's useful for ETL in Redshift with Spark. Usecase: lots of data in S3, open to Redshift, start a spark cluster on EMR, use that to do ETL and write again to Redshift.
-
-> Hive
-
-Interface to do SQL on unstructured data sitting in EMR. It uses HiveQL, similar to SQL, it's interactive, it's scalable, easy OLAP queries, highly optimized, highly extensible. It's the most appropriate way for data warehouse application, more comfortable than Spark.
-
-By default, Hive records metastore info in a MySQL (sql syntax) on the master node's filesystem. if you want the metastore to persist, you must create an external metastore existing outside the cluster. Also to have a centralized metastore in Hive, you have to use an external service, like Glue Data Catalog, or RDS or Aurora.
-
-Hive maintains a "metastore" that imparts a structure you define on the unstructured data stored on HDFS for instance. By default, the metastore is stored in MySQL on the master node, but external metastores offer better resiliency/integration if the cluster shuts down, e.g. glue data catalog (equivalent to hive metastore, but external metastore for hive) or RDS.
-
-Other Hive integrations, you can load table partitions from S3, write tables in S3, load scripts from S3, or use DynamoDB as an external table.
-
 > Apache Pig
 
-Comes installed in EMR directly. Pig is a solution for writing mappers and reducers faster, with Pig Latin, a scripting language with SQL-like syntax. Highly extensible with user defined functions.
-
-EMR integration into S3:
-
-* Directly writing to HCatalog in S3
-* Loading custom JAR files from S3 with the REGISTER command
-* Submitting work from the EMR console using Pig scripts stored in S3
+Service to accelerate writing mappers and reducers, with Pig Latin, a scripting language with SQL-like syntax. Highly extensible with user defined functions.
 
 > Apache HBase
 
-Non-relational, petabyte-scale database, based on Google's BigTable, on top of HDFS. It's very fast because it does processing in-memory. Hive integration. It's very similar for DynamoDB. HBase advantages:
+NoSQL petabyte-scale database, based on Google's BigTable, on top of HDFS. It's very fast because it does processing in-memory. Hive integration. It's very similar to DynamoDB. HBase advantages:
 
 * Efficient storage of sparse data
 * Appropriate for high frequency consistent reads and writes
@@ -679,49 +676,39 @@ DynamoDB:
 * Fully managed (auto-scaling)
 * More integration with other AWS services, like Glue
 
-EMR can integrate HBase in S3 in the following ways:
+HBase can store following data in S3: snapshots, HBase files and metadata, read-replicas
 
-* Snapshots of HBase into S3
-* Storage of HBase files and metadata in S3
-* HBase read-replicas in S3
+> Hive
+
+Interactive SQL on unstructured data which is in EMR for OLAP. It uses HiveQL, similar to SQL. It's the most appropriate way for data warehouse application, more comfortable than Spark. Integration with S3 and DynamoDB. Allows custom code.
+
+By default, Hive has a metastore info in a MySQL on the master node's filesystem. External metastores like Glue Data Catalog, RDS or Aurora offer persistence, centralization so that many users can access, and better resiliency if the cluster shuts down.
 
 > Presto
 
-**Interactive queries at petabyte scale** for OLAP type queries. It can connect to many different big data databases and data stores at once, and query across them. Athena uses this under the hood, Athena is basically serverless Presto.
+Interactive queries at petabyte scale for OLAP. It can connect to many different big data databases and data stores (Redshift, RDS) at once, and query across them. Athena is basically serverless Presto. Custom code not allowed,
 
-> Apache Zeppelin
+---
 
-Notebook on EMR to run Python scripts against your data. Can interleave with notes, can share notebooks with others etc. Can integrate with Spark, to run Spark code interactively, allows for easy experimentation and exploration. Can execute SQL directly against SparkSQL. Query results can be visualized in charts and graphs.
+* EMR notebook
+  * many AWS integrations: backup in S3, hosted in VPC
+  * access only via AWS console
+  * use your own code to interact with cluster, e.g provision cluster
+* Apache Zeppelin
+  * notebook to run Python on EMR data
+  * Notebook notes, share with others
+  * Integration with Spark
+  * Execute SQL directly against SparkSQL
+  * Chart and graph visualization
 
-EMR notebook is similar to Zeppelin but with more AWS integration, notebook backed up to S3 and hosted inside VPC, you can provision clusters from the notebook. It connects to the clutser via Apache Livy. Accessed only via AWS console
+---
 
-> Hue
-
-Hadoop user experience, the graphical frontend for the cluster. IAM and S3 integration
-
-> Splunk
-
-Operational tool, can be used to visualize EMR and S3 data using the EMR hadoop cluster. Makes machine data accessible, usable and valuable.
-
-> Flume
-
-Another way to stream data into che cluster, originally made to handle log aggregation
-
-> MXNet
-
-Deep learning on EMR
-
-> S3DistCP
-
-Tool for copying large amounts of data S3 <-> HDFS
-
-> Other
-
-in EMR Notebooks you can use your own code to interact with the clusters.
-
-* Ganglia can be used for monitoring cluster's performance as a whole and with individual nodes
-* To make MapReduce jobs be more efficient, use AVRO to compress and then uncompress files into 64MB chunks, which is the default HDFS chunk size
-
+* Hue (Hadoop User Experience): graphical frontend for the cluster
+* Splunk: operational tool, can be used to visualize EMR and S3 data using the EMR hadoop cluster. Makes machine data accessible, usable and valuable
+* Flume: Another way to stream data into che cluster, originally made to handle log aggregation
+* MXNet: deep learning on EMR
+* S3DistCP: to copy large amounts of data S3 <-> HDFS
+* Ganglia: to monitor cluster's performance as a whole and with individual nodes
 
 ### 3.4 Data pipeline
 
@@ -845,6 +832,8 @@ Serverless service for interactive queries for S3 (but not from Glacier), data s
 
 Gzip, Avro are not columnar formats so not suitable for Athena
 
+can query from redshift!
+
 Good solution for:
 
 * ad-hoc queries of logs for example
@@ -867,6 +856,8 @@ To optimize performance, have smaller number of large files than many small file
 Athena provides ACID transactions, concurrent users can safely make row-level modifications. You can also recover recently deleted data with SELECT statement.
 
 ### 4.4 Redshift
+
+two types of snapshot, automated and manual. automated takes a snapshot every 8h or following every 5gb per node of data changes. Manual snapshots can be taken at any time, and by default manual snapshots are retained indefinitely even after clutser deletion.
 
 column level grant and revoke to help meet security and compliance requirements
 
@@ -932,11 +923,13 @@ With short query acceleration, we can prioritize short-running queries over long
 Redshift clusters can be resized:
 
 * Elastic resize
-  * Quickly add/remove nodes of same type
-  * Downtime of a few minutes
+  * Not always available
+  * Change the node type, number of nodes, or both
+  * Downtime of 10-15mins, during this cluster is read-only
 * Classic resize
-  * Change number of nodes and/or node type
+  * Change the node type, number of nodes, or both
   * Cluster is read-only for hours, or days
+  * Use this when resizing to or from single-node cluster
   * To keep cluster available during classic resize, use snapshot, restore, resize
 
 Security:
@@ -953,7 +946,15 @@ Redshift serverless:
 * Uses ML to maintain performance across variable and sporadic workloads
 * Spectrum, public endpoints not supported
 
-To ccreate external tables, define the structure for files and register them as tables in glue data catalog.
+To create external tables, define the structure for files and register them as tables in glue data catalog.
+
+dense storage nodes are just HDD, no compute. for queries, use dense compute nodes
+
+Diststyle defines the data distribution style for the whole table.
+
+* diststyle key: rows are distributed according to the values in one column, leader node places matching values on the same node slice. good to use for the main table (trips, for a food sharing app)
+* diststyle even: leader node distirbutes rows across slices in a round-robin fashion. Even distribution is appropriate when a table does not participate in joins. good for tables that change frequently
+* diststyle all: a copy of the entire table is distributed to every node. ensures that every row is collocated for every join that the table participates in. this distribution is approrpiate only for relatively slow-moving tables, tables that are not updated frequently or extensively
 
 ## 5. Visualization
 
@@ -998,12 +999,17 @@ Visualization types:
 * AutoGraph: selects the visualization automatically
 * Bar charts, for comparison and distribution. histogram
 * Line graphs, for changes over time
+* Combo chart: combination of two column charts, two line graphs or column chart + line graph
 * Scatter plots: for correlation
 * Heat map: like pivot tables that highlight outliers and trends
-* Pie graphs, tree maps: for aggregation, to see how much percentage each section has, like a cake
+* Pie/doughnut graphs, tree maps: for aggregation, to see how much percentage each section has, like a cake
 * Pivot tables: for tabular data
 
 For public facing interactive charts and dashboards, write data into S3, enable Cloudfront, and use Highcharts or d3.js to visualize the data on the web.
+
+S3 bucket permissions can be altered through quicksight directly, in case import into spice fails.
+
+Quicksight supports Redshift connectivity, whether the clutser is in a VPC or not. Also if it's another account, by first providing the source's connection details.
 
 ## 6 Security
 
