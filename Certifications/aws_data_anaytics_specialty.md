@@ -712,59 +712,92 @@ Interactive queries at petabyte scale for OLAP. It can connect to many different
 
 ### 3.4 Data pipeline
 
-Managed ETL service for scheduling regular data movement and processing. Integrated with on-prem and cloud.
+Managed ETL service for scheduling regular data movement and processing, running on EC2 (which automatically has Task runners installed and executed)
 
-dependency of tasks, waits for the previous tasks. Supports cross-region pipelines
+Define the business logic of your data management in the pipeline definition, then DP determines the tasks, schedules them and assigns them to task runners. You can write a custom task runner application, or you can use the Task Runner application that is provided by Data Pipeline.
 
-A pipeline definition specifies the business logic of your data management. From the definition, DP determines the tasks, schedules them and assigns them to task runners.
+The pipeline is a container that has:
 
-A pipeline schedules and runs tasks by creating EC2 instances to perform the defined work activities. Task Runner polls for tasks and then performs those tasks. For example, Task Runner could copy log files to S3 and launch EMR clusters. Task Runner is installed and runs automatically on resources created by your pipeline definitions. You can write a custom task runner application, or you can use the Task Runner application that is provided by Data Pipeline.
+* Data nodes: destination of data
+* Activities, like copying
+* Pre-conditions, like readiness check
+* Schedules
 
-If a task is not completed successfully, Data Pipeline retries the task according to your instructions and, if necessary, reassigns it to another task runner. If the task fails repeatedly, you can configure the pipeline to notify you.
+Features:
 
-![ ](img/aws_data_analytics_specialty/data_pipeline.jpg)
+* Runs on EC2 or EMR clusters
+* Provisioning and termination is automatic, depending on the tasks
+* Tasks can depend on other tasks, they can wait for the previous tasks
+* Supports for task retries, and re-assignation to another task runner.
+* Integrated with on-prem and cloud
+* Integration with S3, RDS, DynamoDB and Redshift for storage
+* Supports cross-region pipelines
+* Supports pre-built templates
+
+Example use case: copy log files from EC2 to S3 daily. Launch data analysis from these S3 files into EMR weekly.
 
 ## 4. Analysis
 
 ### 4.1 Kinesis data analytics (KDA)
 
-Serverless analytics service, pay what you consume, but not cheap. Supports schema discovery, it tries to find the data schema.
+Serverless analytics service, but not cheap. Can be used for ETL, schema discovery, metric generation, analytics. It can deliver to KDS, KDF, Lambda, which these can write to S3 or DynamoDB.
 
-RANDOM_CUT_FOREST is a SQL function used to detect anomalies on numeric columns in data stream
+KDA uses Kinesis Processing Units (KPU). A single KPU provides 4 GB of memory and corresponding computing and networking. The default limit for KPUs for your application is 8 KPUs, so the default capacity of the processing app in terms of memory is 32GB.
 
-Reference tables are inexpensive ways to join data for quick lookups, i.e. look up the city associated with a zip code. Mapping is stored in S3.
+With RANDOM_CUT_FOREST, a SQL function, KDA can detect anomalies on numeric columns in data stream.
 
-SQL queries in your app code execute over in-app streams, this represents unbounded data that flows continuously through your app, and to get results sets from this continuously updating input, you often bound queries using a window defined in terms of time or rows.
+The input to KDA comes as unbounded data flowing continuously, and to get results sets, queries are bound using a window defined in terms of time or rows.
 
-* Stagger window: a query that aggregates data using keyed time-based windows that open as data arrives. the keys allow for multiple overlapping windows. It's suited for data that arrives at inconsistent times. Stagger windows are the recommended way to aggregate data using time-based windows, because they reduce late our out-of-order data compared to tumbling windows
-* Tumbling windows: query that aggregates data using distinct time-based windows that open and close at regular intervals, individual records might fall into separate windows, so partial results must be combined later.
-* Sliding windows: a query that aggregates data continuously, using a fixed time or row count interval
-
-KDA can deliver to KDS, KDF, Lambda, and these can write to s3 or DynamoDB.
-
-Kinesis Data Analytics provisions capacity in the form of Kinesis Processing Units (KPU). A single KPU provides you with the memory (4 GB) and corresponding computing and networking. The default limit for KPUs for your application is eight, so the default capacity of the processing app in terms of memory is 32GB.
+* Sliding windows: aggregates data continuously
+  * Fixed time or row-count interval windows
+* Stagger windows: aggregates data using keyed windows that open as data arrives
+  * Time-based windows
+  * Allow for multiple overlapping windows
+  * Good for data that arrives at inconsistent times
+  * They reduce late or out-of-order data
+* Tumbling windows: aggregates data using distinct windows that open and close at regular intervals
+  * Time-based windows
+  * Individual records might fall into separate windows, so partial results must be combined later
+  * Don't reduce late or out-of-order data
 
 > Apache Flink
 
-Apache Flink is a framework for processing data streams, can work with Java and Scala. KDA integrates Fink with AWS, making it serverless. Instead of using SQL, you can develop your own Flink app from scratch and load it into KDA via S3. Sources for Flink can be KDS, or MSK
+Apache Flink is a framework for processing data streams, can work with Java and Scala. KDA integrates Flink with AWS, making it serverless. Instead of using SQL, you can develop your own Flink app from scratch and load it into KDA via S3. Sources for Flink can be KDS, or MSK.
 
-Uses for KDA:
-
-* Streaming ETL
-* Continuous metric generation
-* Responsive analytics
-
-Security:
-
-* IAM roles to read from data streams and write to output destination
+#TODO where does this go? Reference tables are inexpensive ways to join data for quick lookups, i.e. look up the city associated with a zip code. Mapping is stored in S3.
 
 ### 4.2 Opensearch
 
-Fully managed (no serverless, AWS manages the EC2 but you have to decide how many servers in your clusters, no autoscaling) petabyte-scale analysis and reporting, originally started as search engine. For some types of queries, OS can be faster than Spark. You can create a data pipeline with Kinesis, OS and then Dashboards for visualization. Very storage heavy
+Fully managed petabyte-scale analysis (OLAP) and reporting service with *visualization*, originally started as search engine. Very storage heavy.
 
 Main concepts:
 
-* Documents: things you're looking for, can be text, can be json. Every document has a unique ID and a type
+* Not suitable for ad-hoc data querying, for that use Athena
+* Cheaper alternative than KDA for log analysis
+* Data import allowed from: Kinesis, DynamoDB, Logstash / Beats, and Elasticsearch's native API
+* Snapshots stored in S3
+
+When creating cluster, you have to decide:
+
+* Number of nodes in cluster and instance types
+  * Recommended: 3 dedicated master nodes, 3 data nodes
+  * With two, you can have split-brain problem where we don't know which of the two nodes is the actual primary node. With three, the third master node decides which would be the primary
+* Number of shards
+* Storage requirement (otherwise, out of disk space error risk)
+* Autoscaling possibility
+* Whether cluster is in a VPC
+  * How to access cluster if it's in VPC
+    * Cognito
+    * Nginx reverse proxy on EC2 forwarding to ES domain
+    * SSH tunnel for port 5601
+    * VPC direct connect
+    * VPN
+
+Pricing: Pay for what you use, instance-hours (charged even if idle: if not using them, just shut them down), storage, data transfer.
+
+> Search concepts
+
+* Documents: things you're looking for, can be text, json. Every document has a unique ID and a type
 * Types: they define the scema and mapping shared by documents that represent the same sort of thing. Still in ES6, but obsolete in future versions
 * Indices: an index powers search into all docs within a collection of ypes. They contain inverted indices that let you search across everything within them at once
 
@@ -773,62 +806,38 @@ An index is split into shard, each shard might be on a different node in a clust
 * Write requests are routed to the primary shard, then replicated
 * Read requests are routed to the primary or any replica
 
-Options:
+Index state management (ISM) automates index management policies. They run every 30-48 mins, random jitter to ensure they don't all run at once. It can send notification when it's done
 
-* To import data into OS: Kinesis, DynamoDB, Logstash / Beats, and Elasticsearch's native API's
-* OS can scale up and down without downtime, but it has to be set up. Pay for what you use, instance-hours (charge even if idle, if not using them, just shut them down), storage, data transfer.
-* You have to choose how many master nodes you want, and their instance type
-  * Recommended: 3 dedicated master nodes, 3 data nodes
-  * With two, you can have split-brain problem where we don't know which of the two nodes is the actual primary node. With three, the third master node decides which would be the primary
-* Snapshots to S3
-* Most common problem in OS is to run out of disk space, so you have to calculate the minimum storage requirement: source_data * (1 + num_replicas) * 1.45
-* You have to choose the number of shards as well
-  * If shard allocation across nodes is unbalanced, you can get memory pressure
-  * If you see JVMMemoryPressure errors, get fewer shards by deleting old or unused indices, having too many small shards can be bad. shards should be small enough that ES can handle them but not too small that they place needless strain on the hardware
-
-Security:
-
-* Resource-based policies
-* Identity-based policies
-* IP-based policies
-* Request signing
-* You can put the cluster in a VPC. You have to decide that upfront, you can't move it later
-  * How to access cluster if it's in VPC
-    * Cognito
-    * Nginx reverse proxy on EC2 forwarding to ES domain
-    * SSH tunnel for port 5601
-    * VPC direct connect
-    * VPN
-* Cognito integration for the dashboard
-
-OS antipatterns:
-
-* Not suitable for OLTP, for that use RDS/DynamoDB
-* Not suitable for ad-hoc data querying, for that use Athena
-
-Storage types, data can be migrated between different storage types
-
-* Hot: used by standard data nodes, instance stores or EBS volumes. fastest performance, most expensive
-* UltraWarm: uses S3 and caching, best for indices with few writes (like log data or immutable data), slower performance but much lower cost. Requires you to have a dedicated master node
-* Cold: uses S3, suitable for periodic research or forensic analysis on older data, must have dedicated master and have UltraWarm enabled, not compatible with T2 or T3 instance types on data nodes.
-
-Index state management (ISM) automates index management policies, e.g.deletes old indices after a period of time, or moves indices into read only state after some time, or move indices between storage types, reduce replica count over time, automate index snapshot. ISM policies run every 30-48 mins, random jitter to ensure they don't all run at once. It can send notification when it's done.
-
-You can periodically roll up old data into summarized indices, maybe with old data you don't need the whole old data but just the summary. Saves storage costs.
-
-You can transform indexes, to create a different view to analyze data differently It supports grouping and aggregation.
+* deletes old indices after a period of time
+* moves indices into read only state after some time
+* move indices between storage types
+* roll up old data into summarized indices, in case you don't need the whole old data but just the summary. saves storage costs
+* reduce replica count over time
+* automate index snapshot
 
 To ensure high availability or replicate data geographically for better latency, you can replicate indices/mappings/metadata across domains (clusters). The "follower" index (replica) pulls data from "leader" index. to enable this, we need fine-grained access control and node-to-node encryption.
 
 Remote reindex allows copying indices (not the whole cluster) from one cluster to another on demand.
 
-Opensearch can do the job of Kinesis analytics for log analysis and also visualization, much cheaper than Kinesis Analytics and Quicksight.
+> Storage types
+
+Data can be migrated between different storage types
+
+* Hot: used by standard data nodes, instance stores or EBS volumes. fastest performance, most expensive
+* UltraWarm: uses S3 and caching, best for indices with few writes (like log data or immutable data), slower performance but much lower cost. Requires you to have a dedicated master node
+* Cold: uses S3, suitable for periodic research or forensic analysis on older data, must have dedicated master and have UltraWarm enabled, not compatible with T2 or T3 instance types on data nodes
+
+> Errors
+
+* Shard errors:
+  * If shard allocation across nodes is unbalanced, you can get memory pressure
+  * JVMMemoryPressure error: get fewer shards by deleting old or unused indices, having too many small shards can be bad. shards should be small enough that ES can handle them but not too small that they place needless strain on the hardware
 
 ### 4.3 Athena
 
 #TODO review https://docs.aws.amazon.com/athena/index.html
 
-Serverless service for interactive queries for S3 (but not from Glacier), data stays in S3. It uses Presto under the hood. Supports these data formats: csv, json, ORC, parquet, avro.
+Serverless service for interactive (=ad-hoc) queries for S3 (but not from Glacier), data stays in S3. It uses Presto under the hood. Supports these data formats: csv, json, ORC, parquet, avro.
 
 Gzip, Avro are not columnar formats so not suitable for Athena
 
@@ -1069,4 +1078,4 @@ Also supports federation, users outside of AWS get temporary role to access AWS 
 ---
 
 #TODO OLAP (analytics) vs. OLTP? OLTP for transaction, row-based
-OLTP (for thousands of transactions per second), OLAP (longer-live queries that take longer), for analysis
+OLTP (for thousands of transactions per second, RDS, DynamoDB), OLAP (longer-live queries that take longer), for analysis
