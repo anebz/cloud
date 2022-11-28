@@ -4,18 +4,17 @@
 * [AWS Partner practice exams](https://explore.skillbuilder.aws/learn/course/12472/aws-certified-data-analytics-specialty-official-practice-question-set-das-c01-english)
 * [Official AWS exam guide](https://d1.awsstatic.com/training-and-certification/docs-data-analytics-specialty/AWS-Certified-Data-Analytics-Specialty_Exam-Guide.pdf)
 * [Official AWS exam sample questions](https://d1.awsstatic.com/training-and-certification/docs-data-analytics-specialty/AWS-Certified-Data-Analytics-Specialty_Sample-Questions.pdf)
-* [Tutorialsdojo AWS Analytics cheatsheets](https://tutorialsdojo.com/aws-cheat-sheets-analytics-services/)
+* [Tutorialsdojo AWS Analytics cheatsheets](https://tutorialsdojo.com/aws-cheat-sheets-analytics-services/) #TODO check this
 * [Tutorialsdojo exam study path](https://tutorialsdojo.com/aws-certified-data-analytics-specialty-exam-guide-study-path-das-c01-das-c02/) #TODO
 
 - [AWS Data Analytics Specialty](#aws-data-analytics-specialty)
   - [1. Data collection](#1-data-collection)
-    - [1.1 Kinesis](#11-kinesis)
-      - [1.1.1 Data stream](#111-data-stream)
-      - [1.1.2 Kinesis Data Firehose](#112-kinesis-data-firehose)
-    - [1.2 SQS](#12-sqs)
-    - [1.3 IoT](#13-iot)
-    - [1.4 Data migration](#14-data-migration)
-    - [1.5 MSK](#15-msk)
+    - [1.1 Kinesis Data Stream](#11-kinesis-data-stream)
+    - [1.2 Kinesis Data Firehose](#12-kinesis-data-firehose)
+    - [1.3 SQS](#13-sqs)
+    - [1.4 IoT](#14-iot)
+    - [1.5 Data migration](#15-data-migration)
+    - [1.6 MSK](#16-msk)
   - [2. Storage](#2-storage)
     - [2.1 File formats](#21-file-formats)
     - [2.2 S3](#22-s3)
@@ -30,35 +29,31 @@
     - [4.2 Opensearch](#42-opensearch)
     - [4.3 Athena](#43-athena)
     - [4.4 Redshift](#44-redshift)
-  - [5. Visualization](#5-visualization)
-    - [5.1 Quicksight](#51-quicksight)
+  - [5. Quicksight](#5-quicksight)
   - [6 Security](#6-security)
     - [6.1 KMS](#61-kms)
     - [6.2 CloudHSM](#62-cloudhsm)
     - [6.3 STS](#63-sts)
+  - [7. Other](#7-other)
 
 ![ ](img/aws_data_analytics_specialty/data_lake_warehouse.jpg)
 
 ## 1. Data collection
 
-### 1.1 Kinesis
+| Stream                                        | Firehose                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------- |
+| Managed service but shards need configuration | Fully managed                                                       |
+| Real-time                                     | Near real-time                                                      |
+| Provides storage                              | Does not provide storage                                            |
+| 200ms latency for normal, 70ms for enhanced   | min buffer time 60s                                                 |
+| Max data blob: 1MB                            | Max data blob: 1KB                                                  |
+| Data retention from 1 to 35 days              | No data retention                                                   |
+| Manual scaling                                | Automatic scaling                                                   |
+| Supports replay                               | No support for replay                                               |
+| Prod: Agent, SDK, KPL                         | Prod: Stream, DirectPUT                                             |
+| Cons: KDA, Firehose, KCL, Lambda              | Cons: KDA, S3, Redshift, Opensearch, HTTP endpoint, Splunk, MongoDB |
 
-* [Datalake workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/c5661636-bfc3-4771-be38-a4072661bfda/en-US)
-
-Streaming service. Kinesis types:
-
-* **Kinesis Stream**: is real-time, 200ms latency. provides storage. good for low-latency reqs
-* **Kinesis Firehose**: near real-time, no storage good for: iot, clickstream analytics, log analytics, security monitoring
-  * Easiest way to dump streaming data into aws
-  * Minimum latency 60s, max size 1KB
-  * built-in integration with s3 and other services
-  * built-in lambda capability for data transform
-* **Kinesis data analytics**: real-time analytics on the streaming data
-  * SQL: query and analyze streaming data
-  * Apache Flink: stateful stream processing, supports Java and Scala
-* **Video streams**: stream videos inside aws
-
-#### 1.1.1 Data stream
+### 1.1 Kinesis Data Stream
 
 ![ ](img/aws_data_analytics_specialty/data_stream.jpg)
 
@@ -119,10 +114,11 @@ Capacity mode:
   * read records from Kinesis produced by KPL
   * Uses DynamoDB for coordination and checkpointing. If throughput is low, DynamoDB is underprovisioned
   * Already has the logic for parent-first-reading after resharding
+  * Not for SQL
 * Lambda
   * it can de-aggregate from KPL
   * can be used to store data in s3, dynamodb or to run lightweight ETL to Redshift, Opensearch
-* **KDS cannot deliver data directly to S3**
+* **KDS cannot deliver data directly to S3 or Opensearch**
 
 Double data issues:
 
@@ -166,10 +162,11 @@ If bad performance on write, use random partition keys, and update shard count. 
 * encryption on client side can be implemented
 * vpc endpoints are allowed, so that an ec2 instance in a private subnet can access the kinesis stream
 
-#### 1.1.2 Kinesis Data Firehose
+### 1.2 Kinesis Data Firehose
 
 * Firehose is near-real-time, min 60s latency
 * Can read up to 1MB
+* Can use a Lambda for transformation, during the streaming
 * All failed data, source records, transformation failures, can go to another S3 bucket
 
 Producers:
@@ -190,24 +187,12 @@ Destinations
 
 Firehose accumulates records in a buffer, which is flushed based on time and size rules. If size, if you make the rule of 32mb, then if that buffer size is reached, it's flushed. for time, if you set 2mins, it's flushed every 2mins. It can automatically increase the buffer size to increase throughput. For high throughput scenarios, use buffer size limit. For low throughput, use buffer time limit.
 
-| Stream                                        | Firehose                                                 |
-| --------------------------------------------- | -------------------------------------------------------- |
-| Managed service but shards need configuration | Fully managed                                            |
-| Real-time                                     | Near real-time                                           |
-| 200ms latency for normal, 70ms for enhanced   | min buffer time 60s                                      |
-| Max data blob: 1MB                            | Max data blob: 1KB                                       |
-| Data retention from 1 to 35 days              | No data retention                                        |
-| Manual scaling                                | Automatic scaling                                        |
-| Supports replay                               | No support for replay                                    |
-| Prod: Agent, SDK, KPL                         | Prod: Stream, DirectPUT                                  |
-| Cons: Analytics, Firehose, KCL, Lambda        | S3, Redshift, Opensearch, HTTP endpoint, Splunk, MongoDB |
-
 Security:
 
 * Server-side encryption supported with KMS
 * VPC endpoints supported
 
-### 1.2 SQS
+### 1.3 SQS
 
 ![ ](img/aws_data_analytics_specialty/sqs.jpg)
 
@@ -232,7 +217,7 @@ Security:
 * Client-side encryption is allowed, but must be implemented manually
 * VPC endpoint provided through an interface
 
-### 1.3 IoT
+### 1.4 IoT
 
 * Device gateway: entry point for IoT devices to AWS
 * Message broker: pub/sub, messages published to topics, forwards messages to all the clients connected to the topic
@@ -249,7 +234,7 @@ Security:
 * IAM policies, to control access to IoT API
 * Roles can be attached to rules engine to perform their actions
 
-### 1.4 Data migration
+### 1.5 Data migration
 
 * Data migration service (DMS): to migrate on-prem or EC2 databases into aws
   * With Schema conversion tool, you can convert the db schema from one engine to another
@@ -267,7 +252,7 @@ Security:
   * Snowmobile: for huge data transfers,they send a truck instead of a box
     * Storage capacity: less than 100PB, migration size up to exabytes
 
-### 1.5 MSK
+### 1.6 MSK
 
 * [Kinesis & Kafka for fraud detection workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/ad026e95-37fd-4605-a327-b585a53b1300/en-US)
 
@@ -332,29 +317,55 @@ more info: https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.htm
   * Good option to compress JSON
   * Good for improving queries for tables
 * ORC
+  * columnar, good for improving queries for tables
   * compressed and splittable
   * Good option to compress JSON
-  * columnar, good for improving queries for tables
+* Csv
+  * Row-based
 * Avro
   * row-based format for Hadoop
   * Stores in JSON format
   * To optmize files in Hadoop, use AVRO to compress and then uncompress into 64MB chunks, which is the default HDFS chunk size
+* Gzip
+  * compressed row-based
 
 ### 2.2 S3
 
 * Latency is between 100-200ms
 * Min. 3.5k put/copy/post/delete and 5.5k get/head requests per second per prefix per bucket
-* now has strongly consistency for all operations
+* Strong consistency for all operations
+* S3 Select
+  * Byte Range Fetch: fetch a byte-range from an object, like 250 bytes
+  * ScanRange: scan a subset of an object, specify a range of bytes
 * Access point: you can create unique access control policies for each access point to easily control access to shared datasets or different prefixes in the bucket
 * S3 object Lambda: you can change the objects before it's retrieved by the caller application, without creating another object. for that, we need 1 bucket, an access point and an object lambda access point
-* cross region replication: to reduce latency with other regions and to keep the data as up to date as possible
+* Cross region replication: to reduce latency with other regions and to keep the data as up to date as possible
 * S3 and S3 one-zone IA have the same read performance
-* to improve read performance, add random string prefixes to objects
+* To improve read performance, add random string prefixes to objects
+
+By default, an S3 object is owned by the AWS account that uploaded it. So if you upload a file to another account, this account owner will not implicitly have access to it.
 
 > Glacier
 
 * Glacier Select: to query cold data stored in Glacier as fast as possible. If no urgency, it's cheaper to restore data to S3 and then S3 select
-* Glacier vault lock policy prevents anyone from deleting data in Glacier, and glacier vault access policy prevents access. But this only applies to data in Glacier, so if you're dealing with lifecycle rules, make sure to copy data to Glacier from day 1, and then with lifecycle rules move to IA and then delete.
+* Glacier vault lock policy prevents anyone from deleting data in Glacier, and glacier vault access policy prevents access. But this only applies to data in Glacier, so if you're dealing with lifecycle rules, make sure to copy data to Glacier from day 1, and then with lifecycle rules move to IA and then delete
+
+> Encryption
+
+3 methods for encrypting objects in S3:
+
+* SSE-S3: objects are encrypted using keys handled and managed by S3
+  * AES-256 encryption type, must set header "x-amz-server-side-encryption": "AES256"
+* SSE-KMS: keys managed by KMS
+  * Advantages: user control and audit trail. Header: "x-amz-server-side-encryption": "aws:kms"
+* SSE-C: client manages their own keys
+  * Encryption is done in S3, but key is not stored in S3, you need encryption in transit using HTTPS
+  * Encryption key must be provided in HTTP headers for every HTTP request made
+* Client side encryption
+  * You encrypt objects before uploading to S3, and decrypt when retrieving from S3
+  * Client manages the keys and encryption cycle completely
+
+S3 exposes HTTP endpoint, non encrypted, and HTTPS endpoint, with encryption in flight. this is recommended.
 
 ### 2.3 DynamoDB
 
@@ -526,6 +537,8 @@ Glue databrew is a visual data preparation tool for pre-processing large dataset
 * Glue data catalog: first 1M objects stored and accessed are free
 * development endpoints for developing ETL code, like notebooks: charged by the minute
 
+With glue workflow, you can connect ETL activities like crawlers, jobs. You can use triggers to execute a job to run after a crawler is completed. so you would have one trigger to trigger the crawler, and another trigger to trigger the job after the crawler is complete
+
 ### 3.2 Lake formation
 
 High-level service using Glue (to know the schema) and S3 to create **secure** data lakes from S3, on-prem. Loads data and monitors data flows, sets up partitions, helps with encryption and managing keys, defines transformation jobs and monitors them. Supports cross-account access.
@@ -599,7 +612,7 @@ EC2 instance types, you can only choose one for all nodes in the cluster
   * HDFS (Hadoop distributed file system): distributes data blocks across cluster for redundancy. Useful for caching intermediate results with significant random I/O
   * EBS for HDFS: EBS volumes can only be attached when launching a cluster. If you manually detach an EBS volume, EMR treats it as a failure and replaces it
 * Persistent
-  * EMRFS: access S3 as if it were HDFS
+  * EMRFS: access S3 as if it were HDFS. Root volume cannot use EMRFS
 
 > Scaling
 
@@ -760,11 +773,13 @@ The input to KDA comes as unbounded data flowing continuously, and to get result
   * Individual records might fall into separate windows, so partial results must be combined later
   * Don't reduce late or out-of-order data
 
+#TODO where does this go? Reference tables are inexpensive ways to join data for quick lookups, i.e. look up the city associated with a zip code. Mapping is stored in S3.
+
+KDA creates an in-app reference table then loads the reference data immediately. if you want to refresh the data after KDA Creates this table, explicitly call the UpdateApplication API every min. or as often as you want to refresh it. Works for data coming from S3.
+
 > Apache Flink
 
 Apache Flink is a framework for processing data streams, can work with Java and Scala. KDA integrates Flink with AWS, making it serverless. Instead of using SQL, you can develop your own Flink app from scratch and load it into KDA via S3. Sources for Flink can be KDS, or MSK.
-
-#TODO where does this go? Reference tables are inexpensive ways to join data for quick lookups, i.e. look up the city associated with a zip code. Mapping is stored in S3.
 
 ### 4.2 Opensearch
 
@@ -831,17 +846,17 @@ Data can be migrated between different storage types
 
 * Shard errors:
   * If shard allocation across nodes is unbalanced, you can get memory pressure
-  * JVMMemoryPressure error: get fewer shards by deleting old or unused indices, having too many small shards can be bad. shards should be small enough that ES can handle them but not too small that they place needless strain on the hardware
+  * JVMMemoryPressure error: reduce amount of shards by deleting old or unused indices, having too many small shards can be bad. shards should be small enough that ES can handle them but not too small that they place needless strain on the hardware
 
 ### 4.3 Athena
 
-#TODO review https://docs.aws.amazon.com/athena/index.html
+* [User guide](https://docs.aws.amazon.com/athena/index.html)
 
-Serverless service for interactive (=ad-hoc) queries for S3 (but not from Glacier), data stays in S3. It uses Presto under the hood. Supports these data formats: csv, json, ORC, parquet, avro.
+Serverless service for interactive/ad-hoc simple SQL queries from data sources, but data stays in its original location. It uses Presto under the hood.
 
-Gzip, Avro are not columnar formats so not suitable for Athena
+For each dataset that you'd like to query, Athena must have an underlying table it will use for obtaining and returning query results. Therefore, before querying data, a table must be registered in Athena,automatically or manually. The metadata in the table shows data location in Amazon S3, and specifies the structure of the data, for example, column names, data types, and the name of the table.
 
-can query from redshift!
+Natively supports Glue data catalog, which can get data from S3 (not Glacier), Redshift and DynamoDB. Therefore, Athena can also query from these 3 sources. Integration with QuickSight.
 
 Good solution for:
 
@@ -852,69 +867,154 @@ Good solution for:
 * Integration with QuickSight
 * Integration via ODBC/JDBC with other visualization tools
 
-Once you have a Glue data catalog for S3 data, Athena see is automatically and make a table for it automatically.
+How to optimize performance:
 
-You can organize users, teams, apps workloads into Workgroups, to isolate and control query access and track costs by Workgroup. you can create separate workgroups for different teams, and give different permissions, enforce cost constraints. you can track query-related metrics for all workgroup queries. IAM groups cannot manage the isolation of queries and tracking query history for teams.
+* Convert files to columnar formats
+* Have few big files, instead of many small files
+* Use partitions
 
-Pricing: you're charged by TB scanned, and only successful or cancelled queries count, failed queries don't. To save money using Athena, use columnar formats like ORC, Parquet. You get less costs and better performance
+User configuration
 
-athena allows you to set two types of cost controls: per-query limit and per-workgroup limit. works with SNS.
+* A Workgroup can be composed of users/teams/apps/workloads
+* Workgroups allow isolation, query access control, query metrics for each query, cost tracking, cost constraint enforcing
+* IAM groups cannot manage the isolation of queries and tracking query history for groups
 
-To optimize performance, have smaller number of large files than many small files. Also use partitions.
+Pricing
+
+* Charged by TB scanned
+* Charged only for successful or cancelled queries, not for failed queries
+* Using columnar formats improves performance and also saves costs
+* Two types of cost controls: per-query limit and per-workgroup limit
 
 Athena provides ACID transactions, concurrent users can safely make row-level modifications. You can also recover recently deleted data with SELECT statement.
 
 ### 4.4 Redshift
 
-two types of snapshot, automated and manual. automated takes a snapshot every 8h or following every 5gb per node of data changes. Manual snapshots can be taken at any time, and by default manual snapshots are retained indefinitely even after clutser deletion.
+Fully-managed, petabyte-scale data warehouse for structured data (for unstructured, use ETL on EMR). Supports complex analytical queries with SQL and joins (OLAP).
 
-column level grant and revoke to help meet security and compliance requirements
+Features:
 
-Fully-managed (not serverless!) petabyte-scale data warehouse for structured data (for unstructured, use ETL on EMR), designed for online analytic processing. Designed for OLAP, not OLTP (transaction, for this use RDS or DynamoDB). It can scale up and down on demand, and has built-in replication and backups. Doesn't provide low latency.
-
-The cluster is composed of the leader node, connecting to the client via JDBC/ODBC, and the compute nodes.
-
-**Redshift Spectrum** can query exabytes of unstructured data in S3 without loading. It's serverless like Glue data catalog + Athena but instead of having console-based query sql engine, it looks like a table in the Redshift database. It provides limitless concurrency, horizontal scaling. Difference between Spectrum and Glue is that Redshift is thought of more for reporting and analysis, and Glue is for complex transformations. And Athena is faster and cheaper, just runs queries against S3 data.
-
-Redshift has massively parallel processing, columnar data storage and columnar compression.
-
-Redshift supports data lake export to S3 in Parquet format.
-
-AQUA, accelerated query accelerator, is for apps that use S3 and Redshift. Pushes reduction and aggregation queries closer to the data, it has high-bandwidth connection to S3.
-
-Key points:
-
-* Automatic data replication within the cluster
-* Automatic backup to S3
-* Automatic async replicated to another region
-* Automated snapshots
-* Failed nodes or drivers are automatically replaced
-* **However, Redshift is limited to one AZ**
+* On-demand scaling, vertical and horizontal, with downtime
+  * When upscaling, a new cluster is created and the old one remains available as read. then the CNAME flips to new cluster (downtime), then data is moved in parallel to the new cluster
+* Automatic replication to another region but limited to one AZ
   * To maintain a read-replica in another AZ, spin up separate clusters in 1+AZs using Kinesis to simultaneously write data into each cluster. Use Route53 to direct your analytic tools to the nearest cluster when querying your data
-* Scaling is done vertically and horizontally on demand, but with downtime.
-  * A new cluster is created and the old on remains availabla as read. then the CNAME flipped to new cluster (downtime), then data moved in parallel to the new cluster.
+* Snapshots and backed up to S3
+  * Automated: snapshot every 8h or after 5GB/node of data changes
+  * Manual: taken at any time, default retention is indefinite even after cluster deletion
+* Datalake can be exported to S3 in Parquet format
+* Not low-latency
+* Parallel processing, columnar data storage and columnar compression
 
-Decide how data is distributed among the nodes and the slices according to the distribution style you chose during table creation. The styles:
+Cluster features:
 
-* Auto: the service decides based on data size
-* Even: rows distributed across slices in round-robin
-* Key: rows distributed based on one column
-* All: entire table is copied to every node
+* Cluster is composed of leader node, connecting to the client via JDBC/ODBC, and the compute nodes
+* Automatic data replication within the cluster
+* Failed nodes or drivers are automatically replaced
+* Node types:
+  * Dense storage nodes: just storage, no compute
+  * Dense compute nodes: for queries
+* Sort keys determine the order in which rows are stored in a table
 
-Sort keys. Similar to indices. When storing data on disk, rows are stored in sorted order based on the column you designated as sort key. It makes for fast range queries. If you will query based on recency, then make a time-based sort key.
+Other:
 
-Importing / exporting data:
+* Redshift workload management (RWM): tool to prioritize short, fast queries vs. long, slow queries. You can also create query queues
+* Short query acceleration (SQA) uses ML to predict the execution times of queries in advance, and then routes short queries to a dedicated queue. Use when you only have short queries, if you also have long queries, use RWM
 
-* COPY: parallel command to load files from S3/EMR/DynamoDB into Redshift
-  * Try to have as few COPY commands as possible, and file sizes no more than 1GB each, ideally with compression.
+> Data distribution
+
+When creating table, you have to choose distribution styles. These decide how data is distributed among the nodes and the slices. The styles:
+
+* DISTSTYLE AUTO: the service decides based on data size, combination of ALL and EVEN. Cannot do KEY
+* DISTSTYLE ALL: entire table is copied to every node
+  * good for static or tables updated infrequently that are used in joins or as lookup tables
+  * fast queries, but takes a lot of space. And actions on this table like loading, deleting, takes long
+  * don't use it for: small tables (<500KB), tables that will be used once, tables updated frequentiy, or tables with >10M rows
+* DISTSTYLE KEY: rows distributed based on the values in one column, leader node places matching values on the same node slice
+  * Can only use it once
+  * good for tables where there are many rows with a single identifier that **will be used for queries and joins**, like the main table of a service
+* DISTSTYLE EVEN: rows distributed across slices in round-robin
+  * good for tables that don't participate in joins
+  * good for tables with many unique values
+  * good for tables that change frequently
+  * good for tables connected to visualization tools
+
+> Scaling
+
+Concurrency scaling, when there is high demand, adds query processing power to a cluster to specific users or queues as needed. Second-latency, provides users with fast, consistent performance even when there are a lot of queries. It uses ML to predict when queueing might start to happen. Not every query needs a concurrency scaling cluster, only those with high priority. Concurrency scaling is not a substitute for good table and query design.
+
+| Classic resize                                                        | Elastic resize                                    |
+| --------------------------------------------------------------------- | ------------------------------------------------- |
+| Change node type / number of nodes / both                             | Change node type / number of nodes / both         |
+| Can operate on single-node cluster                                    | Can't operate on single-node cluster              |
+| Good for making permanent changes to cluster (double, halve)          | Good for temporary spikes in demand               |
+| Creates new cluster                                                   | Creates new cluster only if node type is changing |
+| Retains sort order, not system tables and records marked for deletion | Retains system log tables, not disk size          |
+| Downtime for hours/days -> read-only                                  | Downtime of 10-15mins -> read-only                |
+
+To create external tables, define the structure for files and register them as tables in glue data catalog.
+
+> Data import / export
+
+Data can be loadad into Redshift from S3, EMR, DynamoDB, EC2 or remote hosts
+
+* COPY: parallel command to load files into Redshift. The table must exist in Redshift, otherwise error
+  * To optimize data import:
+    * File sizes ideal 1–125 MB after compression: if you have smaller files, unify them. if you have bigger files, split them
+    * All files similar size
+    * Compress files
+    * if there is one huge file, split it into the number of files which is multiple of slices in the cluster
   * This command adds hidden metadata columns
-  * This command can also decrypt data as it's loadad from S3
-  * Compression is supported to speed it up even more
-  * To improve loading times, split large files into smaller chunks
-  * Narrow tables (many rows, few columns), load it with one COPY transaction
-* UNLOAD: unload from a table into files in S3
-* INSERT: command is to move data from one table to another, data is already in Redshift
+  * This command can also decrypt data
+  * For narrow tables (many rows, few columns), load it with one COPY transaction
+  * Manifest file:
+    * good option if dataset spans many files, or different prefixes, different buckets
+    * this file ensures that only the correct data is loaded, loaded only once, and provides accountability. then use copy with this manifest file
+    * Avoids the problem of Resume Building Event
+* INSERT: move data from one table to another, data is already in Redshift
 * VACUUM: recover space from deleted rows, it re-sorts rows and reclaims space
+  * When deleting rows, they are not automatically deleted, but rather marked for deletion
+  * When updating rows, new row is appended and old row is marked for deletion
+* UNLOAD: Glue unloads from a Redshift table into S3
+* DBLINK: copy and sync data between PostgreSQL and Redshift
+
+To avoid deduplication when loading data into Redshift:
+
+1. Create a temporary staging table configured like the destination table in Redshift
+2. COPY records to this staging table
+3. JOIN staging table with target table
+4. UPSERT: merges data by updating existing records and adding new data
+5. Delete staging table
+
+If you use UPSERT to COPY new data into a table, the table needs to be sorted
+
+> Queries
+
+Redshift Spectrum
+
+* Serverless service to query exabytes of unstructured data in S3 without loading
+* Limitless concurrency, horizontal scaling
+* Glue data catalog + Athena has console-based query sql engine, with Spectrum it's like a table in the Redshift database
+* Redshift used for reporting and analysis, Glue for complex transformations
+* Athena is faster and cheaper, just runs queries against S3 data
+
+AQUA: accelerated query accelerator, for apps that use S3 and Redshift. Pushes reduction and aggregation queries closer to the data, it has high-bandwidth connection to S3.
+
+> Redshift serverless
+
+* Automatically scale and provision for your workload
+* Uses ML to maintain performance across variable and sporadic workloads
+* Spectrum, public endpoints not supported
+
+> Security
+
+HSM = Hardware security module
+
+* Encryption at rest using KMS or an HSM device, needs establishing a connection
+  * When using HSM, you must use client + server certificate to configure a trusted connection
+  * If you migrate an unencrypted cluster to an HSM-encrypted cluster, you must create the new encrypted cluster and then move data to it
+* Encryption in-flight using the JDBC driver enabled with SSL
+* You can define access privileges for users or groups, with grant or revoke commands in sql
+* To meet security and compliance requirements, set column-level grant and revoke
 
 To copy a snapshot from a KMS-encrypted cluster in another region for backup, then:
 
@@ -923,119 +1023,62 @@ To copy a snapshot from a KMS-encrypted cluster in another region for backup, th
 3. Specify KMS key ID for which you're creating the copy grant
 4. In the source region, enable copying of snapshots to the copy grant created above
 
-With **DBLINK**, Redshift can be connected to PostgreSQL and enable copying and syning data between PostgreSQL and Redshift.
+## 5. Quicksight
 
-Redshift workload management: prioritize short, fast queries vs. long, slow queries. You can also create query queues.
+Serverless business intelligence visualization tool. Supports simple ad-hoc analysis and limited ETL. Used to create and share dashboards privately with specific users, not with the general public. 
 
-With short query acceleration, we can prioritize short-running queries over long-running ones, by making short queries run in a dedicated space. Use this if you only have short queries, else use RWM
+For public facing interactive charts and dashboards, write data into S3, enable Cloudfront, and use Highcharts or d3.js to visualize the data on the web. 
 
-Redshift clusters can be resized:
+Data sources
 
-* Elastic resize
-  * Not always available
-  * Change the node type, number of nodes, or both
-  * Downtime of 10-15mins, during this cluster is read-only
-* Classic resize
-  * Change the node type, number of nodes, or both
-  * Cluster is read-only for hours, or days
-  * Use this when resizing to or from single-node cluster
-  * To keep cluster available during classic resize, use snapshot, restore, resize
+* Redshift
+  * Can connect to Redshift regardless if the cluster is in a VPC or not
+  * If cluster is in another region, create a new security group with an inbound rule authorizing access from the IP range of QuickSight servers in that region
+  * If cluster is in another account, provide the source's connection details
+* Aurora/RDS
+* Athena
+* EC2-hosted dbs
+* Files (on-prem, excel, s3, but not in parquet format)
+  * If import into SPICE fails, edit S3 bucket permissions directly from Quicksight
 
-Security:
+> SPICE (Super-fast parallel in-memory calculation engine)
 
-* Encryption at rest using KMS or an HSM device, in which case you have to establish a connection
-* Encryption in-flight using the JDBC driver enabled with SSL
-* When using Hardware security module, you must use client + server certificate to configure a trusted connection
-  * If you migrate an unencrypted cluster to an HSM-encrypted cluster, you must create the new encrypted cluster and then move data to it
-* You can define access privileges for users or groups, with grant or revoke commands in sql
+* Accelerates interactive queries on large datasets. Each user gets 10GB of SPICE
+* In direct query mode, using Athena, some queries might time out. Good use for SPICE. If it takes >30mins to import data from Athena into SPICE, that means big queries are timing out.
 
-Redshift serverless:
+> Datasets
 
-* Automatically scale and provision for your workload
-* Uses ML to maintain performance across variable and sporadic workloads
-* Spectrum, public endpoints not supported
+* Scheduled dataset refresh: datasets get updated, e.g. daily
 
-To create external tables, define the structure for files and register them as tables in glue data catalog.
+> Visualization types
 
-dense storage nodes are just HDD, no compute. for queries, use dense compute nodes
-
-Diststyle defines the data distribution style for the whole table.
-
-* diststyle key: rows are distributed according to the values in one column, leader node places matching values on the same node slice. good to use for the main table (trips, for a food sharing app)
-* diststyle even: leader node distirbutes rows across slices in a round-robin fashion. Even distribution is appropriate when a table does not participate in joins. good for tables that change frequently
-* diststyle all: a copy of the entire table is distributed to every node. ensures that every row is collocated for every join that the table participates in. this distribution is approrpiate only for relatively slow-moving tables, tables that are not updated frequently or extensively
-
-## 5. Visualization
-
-### 5.1 Quicksight
-
-Serverless tool for business analysts to analzye and visualize data, perform ad-hoc analysis. Allows creating dashboards and contains limited ETL. For more ETL, use Glue/Spark. Not meant for use in the public.
-
-Data sources: Redshift, Aurora/RDS, Athena, EC2-hosted dbs, Files (on-prem, excel, s3, but not in parquet format).
-
-SPICE, super-fast parallel in-memory calculation engine, is used to accelerate interactive queries on large datasets. Each user gets 10GB of SPICE, it's highly available, durable, scalable to many users.
-
-It can accelerate large queries that would time out in direct query mode (=hitting Athena directly), but big queries might still time out on spice, if it takes >30mins to import the data from Athena into Spice.
-
-You can set up scheduled refresh of datasets, so they get updated every day for example.
-
-Security:
-
-* MFA
-* VPC connectivity
-* Row-level security
-* Private VPC access
-
-Quicksight can only access data stored in the same region as Redshift. If they're in different regions, create a new security group with an inbound rule authorizing access from the IP range of QuickSight servers in that region.
-
-Pricing:
-
-Enterprise is double as standard, and it's paid per user per month. Extra Spice capacity can be acquired too. Enterprise includes encryption at rest with AWS managed key and microsoft AD integration.
-
-ML:
-
-* Random cut forest can find anomalies, outliers in the dataset
-* Random cut furest It can also do forecasting, detect seasonality and trends
-* Autonarratives, adds "story of your data" to your dashboard
-* Suggested insight: A new tab displays ready-to-use suggested insights
-
-Quicksight includes ML-powered forecasting.
-
-Quicksight Q is a tool to allow users to query with NLP, offered as add-on in some regions. To use this, you have to set up topics associated to datasets. Datasets and the fields  must be NLP-friendly.
-
-Visualization types:
-
-* AutoGraph: selects the visualization automatically
-* Bar charts, for comparison and distribution. histogram
-* Line graphs, for changes over time
-* Combo chart: combination of two column charts, two line graphs or column chart + line graph
+* AutoGraph: automatically selects the visualization
+* Bar charts / histogram: for comparison and distribution
+* Line graphs: for changes over time
+* Combo chart: combination of two bar charts, two line graphs or bar chart + line graph
 * Scatter plots: for correlation
 * Heat map: like pivot tables that highlight outliers and trends
 * Pie/doughnut graphs, tree maps: for aggregation, to see how much percentage each section has, like a cake
 * Pivot tables: for tabular data
 
-For public facing interactive charts and dashboards, write data into S3, enable Cloudfront, and use Highcharts or d3.js to visualize the data on the web.
+> Enterprise
 
-S3 bucket permissions can be altered through quicksight directly, in case import into spice fails.
+* Double cost as Standard, paid per user per month
+* Extra Spice capacity
+* Encryption at rest with AWS managed key
+* Microsoft AD integration
+* Reader users (users that don't author anything, but just have read access. Can log in with QuickSight user/pass, SAML or AD)
+* Supports 500M rows / 500GB dataset
+  * Standard only 25M rows / 25GB dataset
 
-Quicksight supports Redshift connectivity, whether the clutser is in a VPC or not. Also if it's another account, by first providing the source's connection details.
+> ML
+
+* Random cut forest: find anomalies/outliers in the dataset, forecasting: detect seasonality and trends
+* Autonarratives, adds "story of your data" to your dashboard
+* Suggested insight: A new tab displays ready-to-use suggested insights
+* Quicksight Q: allows queries with NLP, offered as add-on in some regions. To use this, you have to set up topics associated to datasets. Datasets and the fields must be NLP-friendly
 
 ## 6 Security
-
-3 methods for encrypting objects in S3:
-
-* SSE-S3: objects are encrypted using keys handled and managed by S3
-  * AES-256 encryption type, must set header "x-amz-server-side-encryption": "AES256"
-* SSE-KMS: keys managed by KMS
-  * Advantages: user control and audit trail. Header: "x-amz-server-side-encryption": "aws:kms"
-* SSE-C: client manages their own keys
-  * Encryption is done in S3, but key is not stored in S3, you need encryption in transit using HTTPS
-  * Encryption key must be provided in HTTP headers for every HTTP request made
-* Client side encryption
-  * You encrypt objects before uploading to S3, and decrypt when retrieving from S3
-  * Client manages the keys and encryption cycle completely
-
-S3 exposes HTTP endpoint, non encrypted, and HTTPS endpoint, with encryption in flight. this is recommended.
 
 ### 6.1 KMS
 
@@ -1075,7 +1118,7 @@ Also supports federation, users outside of AWS get temporary role to access AWS 
 
 
 
----
+## 7. Other
 
 #TODO OLAP (analytics) vs. OLTP? OLTP for transaction, row-based
 OLTP (for thousands of transactions per second, RDS, DynamoDB), OLAP (longer-live queries that take longer), for analysis
