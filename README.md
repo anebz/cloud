@@ -68,6 +68,7 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 * 🟣 [Lambda the Terraform way](https://github.com/nsriram/lambda-the-terraform-way)
   * Similar [repo](https://github.com/antonbabenko/serverless.tf)
 * 🟣 [Terraform personal notes](Practice/terraform.md)
+* 🟣 [Terraform best practices](https://www.contino.io/insights/terraform-best-practices)
 * [Why the serverless revolution has stalled](https://www.infoq.com/articles/serverless-stalled/)
 * [DevOps exercises](https://github.com/bregman-arie/devops-exercises) and [DevOps resources](https://github.com/bregman-arie/devops-resources)
 * [Scool of SRE](https://linkedin.github.io/school-of-sre/)
@@ -80,12 +81,20 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 * ⭐️ [AWS: Lambda, copy file from S3 to EFS, code](Practice/lambda_s3_to_efs.js)
 * ⭐️ [AWS: Lambda copy file from CloudHealth to S3, personal notes](Practice/cloudhealth_lambda_s3.md)
 * ⭐️ [AWS Lambda with Docker and Serverless, personal notes](Practice/lambda_docker_serverless.md)
+* ⭐️ [AWS Lambda Function URL](https://cloudash.dev/blog/guide-to-lambda-function-urls)
+* ⭐️ [AWS VPC guide](https://twitter.com/simonholdorf/status/1572821022381903877)
 
 ## Tutorials
 
 * [Containers for embedded systems](https://medium.com/@lsbenitezpereira/containers-for-embedded-systems-7c5929bacf1e)
 * [Managing containers with Azure IoT](https://medium.com/@lsbenitezpereira/managing-containers-with-an-iot-platform-4e9a4293a16)
 * [IaC in Azure](https://medium.com/@lsbenitezpereira/streamline-iot-projects-with-infrastructure-as-code-eb8921909c4c)
+
+## Project ideas
+
+* ⭐️ [AWS 7 serverless projects](https://completecoding.mykajabi.com/7-serverless-projects)
+* ⭐️ [Self-Updating Twitter Banner](https://blog.awsfundamentals.com/how-to-build-a-self-updating-twitter-banner-with-dynamic-content)
+* ⭐️ [AWS project ideas](https://townhall.hashnode.com/project-ideas-and-tutorials-aws-amplify-x-hashnode-hackathon)
 
 ## Books
 
