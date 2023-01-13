@@ -15,6 +15,7 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 3. ⭐️⭐️ AWS developer Associate: [Markdown notes](Certifications/aws_developer_associate.md) | [PDF version](Certifications/aws_developer_associate.pdf)
 4. ⭐️⭐️ AWS solutions Associate: [Markdown notes](Certifications/aws_solutions_associate.md) | [PDF version](Certifications/aws_solutions_associate.pdf)
 5. ⭐️⭐️⭐️ AWS data analytics specialty: [Markdown notes](Certifications/aws_data_anaytics_specialty.md) | [PDF version](Certifications/aws_data_anaytics_specialty.pdf)
+6. ⭐️⭐️⭐️ AWS machine learning specialty: [Markdown notes](Certifications/aws_machine_learning_specialty.md)
 
 ## Azure certifications
 
