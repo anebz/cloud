@@ -275,30 +275,185 @@ You can connect notebook to a remote EMR cluster running Spark, or use Zeppelin.
 #### Comprehend
 
 * NLP and text analytics
-* Extract key phrases, entities, sentiment, language, syntax, topics and document classificaction
+* Extract key phrases, entities, sentiment, language, syntax detection, topics and document classificaction
 * Can train on own data
 
 #### Translate
 
-
-#### Polly
-
+* Deep learning for translation
+* Supports custom dictionary, in CSV or TMX formatting, with their translations. Appropriate for proper names, brand names, etc.
+* Automatic language detection
 
 #### Transcribe
 
+* Speech to text
+  * Input in FLAC, MP3, MP4 or WAV in specified language
+  * Streaming audio supported (HTTP/2 or WebSocket), but only for english, french and spanish
+* Speaker identification, how many speakers
+* Channel identification: two callers can be transcribed separatedly, merging based on timing of utterances
+* Automatic language identification
+* Support custom vocabularies: vocab lists (just list of speciali words) or vocab tables (can onclude "SoundsLike", "IPA" (international phonetic alphabet) or "DisplayAs")
 
-#### Lex
+Create job, add audio file and it translates. You can create vocabulary from the UI
 
+#### Polly
+
+* Text to speech
+* Lexicons
+  * Customize pronunciation of specific words and phrases
+* SSML (speech synthesis markup language)
+  * Alternative to plain text, gives control over emphasis, pronunciation, breathing, whispering, speech rate, pitch, pauses
+* Speech marks
+  * Can encode when sentence/word starts and ends in the audio stream. Useful for lip-synching animation
 
 #### Rekognition
 
+* Object and scene detection
+* Image moderation, facial analysis, face comparison
+  * You can use your own face collection
+* Celebrity recognition
+* Text in image
+* Video analysis
+  * Objects/people/celebrities marked on timeline, people pathing
+* Images come from S3, or provide image bytes as part of request
+* Facial recognition depends on lighting, angle, eye visibility, resolution
+* Video must come from Kinesis Video Streams: H.264 encoded, 5-30FPS, favor resolution over framerate
+* Can use with Lambda to trigger image analysis upon upload
+* Supports custom labels, you can provide a small set of labeled images. Use your own labels for unique items
 
-#### Personalize/forecast/textract
+#### Forecast
 
+* Time series analysis
+* AutoML chooses best model for time series, you don't have to choose it yourself
+* Works with any time series. It can combine with associated data to find relationships
 
-#### DeepLens
+---
 
+* CNN-QR (quantile regression)
+  * Computationally expensive -> expensive
+  * BEst for large dataset with hundreds of time series
+  * Accepts related historical time series data & metadata
+  * The only one who accepts past data
+* DeepAR+
+  * Recurrent NN
+  * Best for large datasets with hundreds of time series
+  * Accepts forward-looking time series & metadata
+* Prophet
+  * Additive model, handling non-linear trends and seasonality
+  * Cheaper than DL
+* NPTS (non-parametric time series)
+  * Simple and cheap
+  * Good for sparse data
+  * Has variants for seasonal / climatological forecasts
+* ARIMA (Autoregressive integrated moving average)
+  * Simple datasets, <100 time series
+* ETS (exponential smoothing)
+  * Lightweight
+  * Simple datasets, <100 time series
 
+#### Lex
+
+* Chatbot engine
+* Utterances invoke intents ("I want to oder a pizza")
+* Lambda functions are invoked to fulfill the intent
+* Slots specify extra information needed by the intent (pizza size, toppings etc.). Has to be coded
+* Can deploy to AWS Mobile SDK, Facebook Messenger, Slack, Twilio
+* Alexa uses Transcribe and Polly for text-to-speech and speech-to-text
+
+Amazon Lex Automated Chatbot Designer
+
+* You provide existing conversation transcripts
+* Lex applies NLP and deep learning to remove overlaps and ambiguity
+* Intents, user requests, phrases, values for slots are extracted
+* Ensures intents are well defined and separated
+
+#### Personalize
+
+* Recommendation engine
+* API, console and CLI support
+* Provide data (purchases, ratings, user demographics, contextual recommendations like device type, time, etc.)
+* For big batch operation: add data to S3, give schema to Personalize and then it will monitor S3 for that data
+* For real-time, send data through API
+* Explicit schema in Avro format must be provided
+* Javascript or SDK
+* **GetRecommendations**
+  * Returns recommended products, content, etc.
+  * Returns similar items
+* **GetPersonalizedRanking**
+  * Rank a list of items provided
+  * Allows editorial control/curation
+
+Features:
+
+* It can create recommendations for new users and new items that it hasn't seen before (the cold start problem). Just recommends popular items to new users. And for new items, they don't stay new for long, as soon as someone buys it, it starts building relationships to other items and Personalize recomputes this every two hours.
+* Can make sense of unstructured text input
+* Intelligent user segmentation, automatically classify users into groups for marketing campaigns
+* Recipes: USER_PERSONALIZATION, PERSONALIZED_RANKING, RELATED_ITEMS
+* Solution optimizes for relevance as well as additional objectives like video length, price, etc. (but must be numeric)
+* It also does automatic hyperparam optimization
+* Campaign: deploys the model and deploys endpoint to generate real-time recommendations
+
+Hyperparameters:
+
+* User-personalization and personalized-ranking recipes, these hyperparams:
+  * hidden_dimension (how many hidden variables), automatically optimized
+  * bppt (back-propagation through time, creates RNN, gives less value to older events)
+  * recency_mask (weights recent events, another way apart from bppt)
+  * min/max_user_history_length_percentile (filters out robots)
+    * max: exclude people with a long user history, e.g. robots, crawlers, institutional buyers: people who purchase a group's stuff under their name
+    * min: exclude people who only looked at 1-2 things
+  * exploration_weight, 0-1, controls relevance of results. If you get few results, turn it down to get more, less relevant results
+  * exploration_item_age_cut_off, how far in time you go
+* for similar-items recipe
+  * items_id_hidden_dimension, automatically optimized
+  * item_metadata_hidden_dimension, automatically optimized with min & max range specified
+
+To maintain relevance, keep the dataset current: incremental data import. To do that real-time, use PutEvents API call to feed in real-time user behavior.
+
+Also retrain the model, by default it updates every 2h. It should also do a full retrain (trainingMode=FULL) weekly.
+
+Security:
+
+* Data is not shared across accounts, Amazon is not allowed to pool in data from everyone to create better results
+* Data can be encrypted with KMS
+* data can be encrypted at rest in your region, SSE-S3
+* Data in transit between your account and Amazon's internal systems is encrypted with TLS 1.2
+* Access control is done through IAM
+* Monitoring and logging via CloudWatch and CloudTrail
+* Data in S3 must have appropriate policy for Personalize to access it
+
+Pricing:
+
+* Data ingestion, per GB
+* Training, per training-hour
+* Inference, per transactions-per-second-hour
+* Batch recommendations, per user or per item
+
+Other:
+
+* Textract: OCR with forms, fields, tables support
+* DeepRacer: research tool, RL-powered 1/18-scale race car
+* DeepLens: research tool, DL-enabled video camera, integrated with Rekognition, SageMaker, Polly, Tensorflow, MXNet, Caffe
+
+Industrial applications
+
+* Lookout
+  * Anomaly detection from sensor data to detect equipment/metrics/vision issues
+  * Monitors metrics from S3, RDS, Redshift or 3rd party SaaS apps
+* Monitron
+  * End-to-end system for monitoring industrial equiment and predictive maintenance. Provides sensors, gateways, service and app
+
+Other:
+
+* TorchServe: Model serving framework for PyTorch
+* Neuron: SDK for ML inference specifically on AWS Inferentia chips (Inf1 instance type). Integrated with SageMaker or other DL AMIs
+* Panorama: CV at the edge, at IP cameras
+* DeepComposer: AI-powered keyboard. Give it a bit of melody and it creates an entire song. For educational purposes
+* Fraud detector: upload historical fraud data. It builds custom model from a template you choose. Exposes an API for your online apps. It accesses the risk based on if the account is new, guest checkout, "try before you buy" abuse, or online payments
+* CodeGuru: automated code reviews. Finds lines of code that hurt performance, resource leaks, race conditions. Offers recommendations. Supports Java and Python
+* Contact Lens for Connect: contact lenses made for customer support call centers. Ingests audio from recorded phone calls. Allows search on calls and chats. Does sentiment analysis
+* Kendra: Enterprise search for intranet with NLP. Combines data from filesystems, SharePoint, intranet, into one searchable repository
+* Augmented AI (A2I): human review of ML predictions. Builds workflows for reviewing low-confidence predictions. Access the Mechanical Turk workforce. Integrated into Textract, Rekognition and Sagemaker. Very similar to Ground Truth
 
 ## Evaluation and tuning
 
