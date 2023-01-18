@@ -1,5 +1,47 @@
 # AWS Machine Learning Specialty
 
+- [AWS Machine Learning Specialty](#aws-machine-learning-specialty)
+  - [Data engineering](#data-engineering)
+    - [S3](#s3)
+    - [Kinesis Video Stream](#kinesis-video-stream)
+    - [Data pipelines](#data-pipelines)
+    - [AWS Batch](#aws-batch)
+    - [Step functions](#step-functions)
+  - [Exploratory data analysis](#exploratory-data-analysis)
+  - [Analyis tools](#analyis-tools)
+    - [Athena](#athena)
+    - [Quicksight](#quicksight)
+    - [EMR](#emr)
+    - [Apache Spark](#apache-spark)
+  - [Feature engineering](#feature-engineering)
+  - [Modeling](#modeling)
+    - [Sagemaker](#sagemaker)
+      - [Machine learning](#machine-learning)
+      - [Text](#text)
+      - [Images](#images)
+      - [Clustering](#clustering)
+    - [Topic modeling](#topic-modeling)
+      - [Pre-training bias metrics in Clarify](#pre-training-bias-metrics-in-clarify)
+    - [High-level AI services](#high-level-ai-services)
+      - [Comprehend](#comprehend)
+      - [Translate](#translate)
+      - [Transcribe](#transcribe)
+      - [Polly](#polly)
+      - [Rekognition](#rekognition)
+      - [Forecast](#forecast)
+      - [Lex](#lex)
+      - [Personalize](#personalize)
+  - [Evaluation and tuning](#evaluation-and-tuning)
+  - [ML implementation and operations](#ml-implementation-and-operations)
+    - [Docker](#docker)
+    - [SageMaker on the Edge](#sagemaker-on-the-edge)
+    - [Security](#security)
+    - [Elastic inference](#elastic-inference)
+    - [Serverless inference](#serverless-inference)
+    - [Inference recommender](#inference-recommender)
+    - [Inference pipelines](#inference-pipelines)
+
+
 ## Data engineering
 
 ### S3
@@ -464,11 +506,123 @@ Other:
 
 ## ML implementation and operations
 
-Using containers
-Security in SM
-A/B testing
-Tensorflow integration
-Neo and Greengrass
-Pipes
-Elastic inference
-Inference pipelines
+### Docker
+
+Structure of a training container
+
+```
+/opt/ml
+---input
+------config
+---------hyperparameters.json
+---------resourceConfig.json
+------data
+---------<channel_name>
+------------<input data>
+---model
+------<model files>
+---code
+------<script files>
+---output
+------failure
+```
+
+Structure of Docker image. You can have 1 image for training and 1 for inference, or both combined
+
+* WORKDIR
+  * nginx.conf
+  * predictor.py (Flask web server to make predictions at runtime)
+  * serve/ (launches gunicorn server, multiple flask web servers defined in predictor)
+  * train/ (invoked when running the training)
+  * wsgi.py (wrapper to invoke flask app for serving results)
+
+```Dockerfile
+FROM tensorflow/tensorflow:2.0.0a0
+RUN pip install sagemaker-containers
+# copies training code inside container
+COPY train.py /opt/ml/code/train.py
+# defines train.py as script entrypoint
+ENV SAGEMAKER_PROGRAM train.py
+```
+
+You can test out many models on live traffic using Production Variants, to distribute traffic among different models.
+
+### SageMaker on the Edge
+
+* SG Neo
+  * Machine Learning for edge devices: ARM, Intel, Nvidia, can be embedded in anything
+  * Optimizes code for specific devices: tensorflow, MXNet, PyTorch, ONNX, XGBoost
+  * Consists of a compiler and a runtime
+* Greengrass
+  * Neo-compiled models can be deployed to an HTTPS endpoint
+    * Hosted on C5, M5, M4, P3 or P2 instances
+    * Must be the same instance type used for compilation
+  * Or you can deploy model to IoT Greengrass, without Neo
+    * Inference at the edge with local data, using model trained in the cloud
+    * Uses Lambda inference applications
+
+### Security
+
+Notebooks and everything under /opt/ml/ and /tmp can be encrypted with a KMS key.
+
+In transit, inter-node training communication can be encrypted, via console or API when setting up a training/tuning job. Increases training time eand cost.
+
+To set up a private VPC, you will need to set up S3 VPC endpoints.
+
+Notebooks are Internet-enabled by default, which can be a security issue. If you disable this, the VPC needs an interface endpoint (PrivateLink) or NAT Gateway and allow outbound connections for training and hosting to work.
+
+Training and Inference containers are also Internet-enabled by default. Network isolation is possible but this also prevents S3 access.
+
+CloudWatch can log, monitor and alarm on:
+
+* Invocations and endpoint latency
+* Health of instance nodes (CPU, memory, etc.)
+* Ground Truth (active workers, how much they are doing)
+
+---
+
+* Training: GPU instance types: P2, P3
+  * Training on spot instances: can save up a lot of money. Use checkpoints to S3 so training can resume in case the instance gets interrupted. Can increase training time
+* Inference: C4, C5 types
+
+### Elastic inference
+
+* Accelerates DL inference, and cheaper than using a GPU instance
+* Only works for Tensorflow, PyTorch and MXNet pre-built containers. ONNX can be used to export models to MXNet
+* Only works with custom containers built with EI-enabled Tensorflow, PyTorch or MXNet
+* Only works with image classification and object detection built-in algorithms
+* Add EI accelerators (ml.eia1.medium / large / xlarge) alongside a CPU instance or to notebooks
+
+In production you can set up automatic scaling: set a scaling policy to define target metrics, min/max capacity, cooldown periods.
+
+SG automatically tries to distribute instances across AZs, but for this to work you need more than one instance. For that, deploy multiple instances for each production endpoint and configure VPCs with at least 2 subnets, each in a different AZ.
+
+### Serverless inference
+
+* Serverless endpoints
+* Good option for infrequent or unpredictable traffic: it will scale down to zero when there are no requests
+* Specify container, memory requirement, concurrency requirement
+* Charged based on usage
+* Monitor via CloudWatch: ModelSetuptime, Invocations, MemoryUtilization
+
+### Inference recommender
+
+* Recommends best instance type and config for your model and deploys to optimal inference endpoint
+* Automates load testing, model tuning
+* How it works:
+  * Register model in model registry
+  * Benchmark different endpoint configs
+  * Collect and visualize metrics to decide on instance types
+  * Existing models from zoos may have benchmarks already
+* Instance recommendation: runs load test on recommended instance types, takes 45mins
+* Endpoint recommendation: cuustom load test, you specify instances, traffic patterns, latency requirements, throughput requirements. Takes 2h
+
+### Inference pipelines
+
+* Linear sequence of 2-15 containers
+* Any combination of pre-trained built-in algorithmy or your own algorithms in containers
+* Combines pre-processing, predictions, post-processing
+* SparkML and scikit-learn containers work well
+  * SparkML can be run with Glue or EMR, it will be serialized into MLeap format
+* Can handle both real-time inference and batch-transforms
+
