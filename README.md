@@ -84,6 +84,7 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 * ⭐️ [AWS Lambda with Docker and Serverless, personal notes](Practice/lambda_docker_serverless.md)
 * ⭐️ [AWS Lambda Function URL](https://cloudash.dev/blog/guide-to-lambda-function-urls)
 * ⭐️ [AWS VPC guide](https://twitter.com/simonholdorf/status/1572821022381903877)
+* [AWS IAM Roles – Everything You Need to Know & Examples](https://spacelift.io/blog/aws-iam-roles)
 
 ## Tutorials
 
