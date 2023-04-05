@@ -1,19 +1,21 @@
 # AWS Machine Learning Specialty
 
+* [Sample questions from AWS](https://d1.awsstatic.com/training-and-certification/docs-ml/AWS-Certified-Machine-Learning-Specialty_Sample-Questions.pdf)
+* [Practice exam from AWS](https://explore.skillbuilder.aws/learn/course/external/view/elearning/12469/aws-certified-machine-learning-specialty-practice-question-set-mls-c01-english)
+* [Examtopics question dump](https://www.examtopics.com/exams/amazon/aws-certified-machine-learning-specialty/view/)
+
 - [AWS Machine Learning Specialty](#aws-machine-learning-specialty)
   - [Data engineering](#data-engineering)
     - [S3](#s3)
+    - [Kinesis data streams](#kinesis-data-streams)
+    - [Kinesis data firehose](#kinesis-data-firehose)
     - [Kinesis Video Stream](#kinesis-video-stream)
     - [Data pipelines](#data-pipelines)
     - [AWS Batch](#aws-batch)
     - [Step functions](#step-functions)
-  - [Exploratory data analysis](#exploratory-data-analysis)
-  - [Analyis tools](#analyis-tools)
-    - [Athena](#athena)
-    - [Quicksight](#quicksight)
-    - [EMR](#emr)
-    - [Apache Spark](#apache-spark)
+    - [Redshift](#redshift)
   - [Feature engineering](#feature-engineering)
+  - [Exploratory data analysis](#exploratory-data-analysis)
   - [Modeling](#modeling)
     - [Sagemaker](#sagemaker)
       - [Machine learning](#machine-learning)
@@ -40,13 +42,33 @@
     - [Serverless inference](#serverless-inference)
     - [Inference recommender](#inference-recommender)
     - [Inference pipelines](#inference-pipelines)
+    - [SG Endpoint](#sg-endpoint)
+  - [collaborative filtering models](#collaborative-filtering-models)
 
 
 ## Data engineering
 
+You can create CloudWatch metrics using the CloudWatch API and deliver training metrics from sagemaker, like when it is overfitting. you can also use a lambda to do mitigation, e.g. stop the model training if it overfits
+
 ### S3
 
-S3 Analytics gives recommendations to when to transition objects to the right storage class. Only works for Standard and Standard IA. Creates a report daily
+S3 Analytics gives recommendations to when to transition objects to the right storage class. Only works for Standard and Standard IA. Creates a report daily.
+
+For faster training and setting up speeds, use Amazon FSx for Lustre to serve the S3 training data to SageMaker.
+
+### Kinesis data streams
+
+One shard up to 1000 transactions/s or 1MB/s. If the file is 8kb, that means 8MB/s. So we need 8 shards.
+Stream can deliver to glue streaming job.
+
+Streams can deliver to ETL Glue, which can transform files into Parquet, and Glue can deliver to S3.
+
+### Kinesis data firehose
+
+Max buffer interval is 900s. that means it waits 900s until data comes, and then sends all of it downstream.
+Can convert csv to json, but not csv to parquet.
+
+Earlier, to deliver to redshift, we had to do kdf -> s3 -> copy into redshift. but now there is redshift streaming ingestion to automatically ingest data into redshift.
 
 ### Kinesis Video Stream
 
@@ -92,20 +114,15 @@ Service to orchestrate workflows. Supports advanced error handling and retry mec
 
 Max execution time of 1 year.
 
-## Exploratory data analysis
+### Redshift
 
-scikit_learn
-data distributions
-trends and seasonality
-
-## Analyis tools
-
-### Athena
-### Quicksight
-### EMR
-### Apache Spark
+Includes Redshift ML, to access the model with SQL commands. No need to move it to S3 and then SageMaker.
 
 ## Feature engineering
+
+tf-idf:
+
+the TF-IDF matrix dimensions: one axis is the amount of sentences, the other axis is the amount of unique unigrams + amount of unique bigrams, if that is what the analysis is based on.
 
 Imputations methods
 Outliers
@@ -116,9 +133,33 @@ Scaling and normalization
 
 Sagemaker ground truth manages human labeling, and also dynamically creates a model so fewer and fewer samples have to be labeled in the future.
 
+Sagemaker Pipe mode: streams S3 data to the training container, improving the performance of training jobs. Pipe mode can also reduce the size of EBS volumes for the training instances. to optimize, convert data into protobuf.recordIO.
+
+Input of data to Sagemaker can have 2 modes: file mode and pipe mode. File mode uses disk space to store both final model artifacts and full training dataset. By using Pipe, you reduce the size of the EBS volumes of the training instances. It only needs to store the final model artifacts
+
+## Exploratory data analysis
+
+For low-dimensional datasets, it's bad to have numerical features that have wide-ranging differences. Normalization should be applied.
+
+quantile-binning transformation: process to discover non-linearity in the variable's distribution by grouping observed values together.
+orthogonal sparse bigram (OSB) transformation is an alternative to the n-gram transformation.
+t-SNE (t-distributed stochastic neighbor embedding) is a non-linear dimensionality reduction algorithm, similar to PCA
+
+MICE (multiple imputations by chained equations) is an algorithm to deal with missing data in dataset, works with categorical values.
+
+negative correlation coefficient means the bigger the x, the lower the y.
+
+AUC is area under the ROC curve. the higher the true positives.
+
 ## Modeling
 
 ### Sagemaker
+
+Only supports file formats csv and jpg.
+
+with lifecycle configuration, you can automate initial installation of libraries when creating a notebook for example.
+
+If you build a custom training container using a python training script that he developed on his local machine, then After copying the script to the location inside the container that is expected by SageMaker, you must define it as the script entry point in the SAGEMAKER_PROGRAM environment variable. When training starts, the interpreter executes the entry point defined by SAGEMAKER_PROGRAM.
 
 #### Machine learning
 
@@ -140,6 +181,7 @@ Sagemaker ground truth manages human labeling, and also dynamically creates a mo
     * Each record must contain Start: the starting time stamp and Target (time series values)
     * Optionally they can contain dynamic_features and categorical features
     * The entire time series is used for training, testing and inference
+  * better results than autoregressive inegrated moving average (ARIMA) and error, trend and seasonality (ETS)
 * K-nearest-neighbors
   * Used for classification and regression
   * Input: recordIO-protobuf or csv (first column is the label). File or pipe mode
@@ -155,7 +197,7 @@ Sagemaker ground truth manages human labeling, and also dynamically creates a mo
   * Input: recordIO-protobuf with Float32. csv isn't practical for sparse data
   * Hyperparams: initialization methods for bias, factors and linear terms
   * CPU and GPU, but CPU recommended because GPU only works with dense data
-* IP insights
+* **IP insights**
   * Unsupervised learning of IP address usage patterns, identify suspicious behavior
   * Input: csv only. Usernames, account IDs can be fed directly, no need to pre-process
   * Hyperparams: num_entity_vectors, vector_dm (if too big, overfitting)
@@ -320,6 +362,8 @@ You can connect notebook to a remote EMR cluster running Spark, or use Zeppelin.
 * Extract key phrases, entities, sentiment, language, syntax detection, topics and document classificaction
 * Can train on own data
 
+Supports custom entity recognition model to identify new entity types not supported as one of the preset generic entity types. Better solution than using regex or string matching.
+
 #### Translate
 
 * Deep learning for translation
@@ -345,6 +389,8 @@ Create job, add audio file and it translates. You can create vocabulary from the
   * Customize pronunciation of specific words and phrases
 * SSML (speech synthesis markup language)
   * Alternative to plain text, gives control over emphasis, pronunciation, breathing, whispering, speech rate, pitch, pauses
+  * But there is no "pronunciation" tag. but "emphasis" works.
+  * If something is pronounced wrong, use pronunciaton lexicons
 * Speech marks
   * Can encode when sentence/word starts and ends in the audio stream. Useful for lip-synching animation
 
@@ -368,6 +414,12 @@ Create job, add audio file and it translates. You can create vocabulary from the
 * Time series analysis
 * AutoML chooses best model for time series, you don't have to choose it yourself
 * Works with any time series. It can combine with associated data to find relationships
+
+Different filling methods:
+
+* Middle filling: fills any missing values between the item start and item end data of a data set
+* Back filling: fills any missing values between the last recorded data point and the global end date of a dataset
+* Future filling: fills any missing values between the global end date and the end of the forecast horizon
 
 ---
 
@@ -474,6 +526,7 @@ Pricing:
 Other:
 
 * Textract: OCR with forms, fields, tables support
+  * Use Augmented AI (A2I) to get low-confidence results from Textract's AnalyzeDocument API operation reviewed by humans
 * DeepRacer: research tool, RL-powered 1/18-scale race car
 * DeepLens: research tool, DL-enabled video camera, integrated with Rekognition, SageMaker, Polly, Tensorflow, MXNet, Caffe
 
@@ -495,14 +548,20 @@ Other:
 * CodeGuru: automated code reviews. Finds lines of code that hurt performance, resource leaks, race conditions. Offers recommendations. Supports Java and Python
 * Contact Lens for Connect: contact lenses made for customer support call centers. Ingests audio from recorded phone calls. Allows search on calls and chats. Does sentiment analysis
 * Kendra: Enterprise search for intranet with NLP. Combines data from filesystems, SharePoint, intranet, into one searchable repository
-* Augmented AI (A2I): human review of ML predictions. Builds workflows for reviewing low-confidence predictions. Access the Mechanical Turk workforce. Integrated into Textract, Rekognition and Sagemaker. Very similar to Ground Truth
+* Augmented AI (A2I): human review of ML predictions. Builds workflows for reviewing low-confidence predictions. Access the Mechanical Turk workforce. Integrated into Textract, Rekognition and Sagemaker. Very similar to Ground Truth but here humans review labels, like your own team. not other 3rd party people
 
 ## Evaluation and tuning
 
 * Confusion matrix
 * rMSE
 * precision and recall, F! score
+  * recall: tp / tp + fn
+  * false negative rate: fn / (fn + tp)
 * ROC / AUC
+
+Residual plot is for regression and shows how far away (positive or negative) the predicted value is compared to the expected value. Whether the model is underestimating or overestimating on the target.
+
+ContinuousParameterRanges of logarithmic helps with learning rates with a range that spans several orders of magnitude. For example, if you are tuning a linear learner model and you specify a range of values between .0001 and 1.0 for the learning_rate hyperparameter, searching uniformly on a logarithmic scale gives you a better sample of the entire range than searching on a linear scale would. This is because searching on a linear scale would, on average, devote 90 percent of your training budget to only the values between .1 and 1.0, leaving only 10 percent of your training budget for the values between .0001 and .1.
 
 ## ML implementation and operations
 
@@ -626,3 +685,12 @@ SG automatically tries to distribute instances across AZs, but for this to work 
   * SparkML can be run with Glue or EMR, it will be serialized into MLeap format
 * Can handle both real-time inference and batch-transforms
 
+### SG Endpoint
+
+Multi-model endpoint works for several models. They use a shared serving container, enabled to host several models. Improves endpoint utilization compared with using single-model endpoints, and reduces also the deployment overhead. to increase availability, add SG instances of the same size and use the existing endpoint to host them.
+
+Adding another endpoint and an ALB wouldn't work because ALB doesn't support hostname as targets.
+
+## collaborative filtering models
+
+leverages other user's experiences. users with similar tastes (based on observed user-item interactions) are likely to have similar interactions with items they haven't seen before. works better when there is a lot of data. it's a recommender model.
