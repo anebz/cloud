@@ -2,6 +2,10 @@
 
 * [Sample questions from AWS](https://d1.awsstatic.com/training-and-certification/docs-ml/AWS-Certified-Machine-Learning-Specialty_Sample-Questions.pdf)
 * [Practice exam from AWS](https://explore.skillbuilder.aws/learn/course/external/view/elearning/12469/aws-certified-machine-learning-specialty-practice-question-set-mls-c01-english)
+* [Udemy course with practice exam](https://capgemini.udemy.com/course/aws-machine-learning-a-complete-guide-with-python/learn/quiz/4774522#overview)
+* [Udemy course with practice exam 2](https://capgemini.udemy.com/course/aws-certified-machine-learning-specialty-mls/)
+* [Udemy practice exams](https://udemy.com/course/aws-certified-machine-learning-specialty-full-practice-exams/)
+* [Udemy practice exam 2](https://capgemini.udemy.com/course/aws-machine-learning-practice-exam)
 * [Examtopics question dump](https://www.examtopics.com/exams/amazon/aws-certified-machine-learning-specialty/view/)
 
 - [AWS Machine Learning Specialty](#aws-machine-learning-specialty)
@@ -17,7 +21,6 @@
     - [EBS](#ebs)
   - [Feature engineering](#feature-engineering)
   - [Sagemaker](#sagemaker)
-    - [Sagemaker notebook](#sagemaker-notebook)
     - [Data input](#data-input)
     - [SageMaker built-in algorithms](#sagemaker-built-in-algorithms)
     - [Text algorithms](#text-algorithms)
@@ -46,7 +49,6 @@
       - [Serverless inference](#serverless-inference)
       - [Inference recommender](#inference-recommender)
       - [Inference pipelines](#inference-pipelines)
-      - [SG Endpoint](#sg-endpoint)
 
 
 ## Data engineering
@@ -60,7 +62,7 @@
 
 ### Kinesis data streams
 
-* One shard can handle up to 1000 transactions/s or 1MB/s. If the file is 8kb, that means 8MB/s. So we need 8 shards.
+* One shard can handle up to 1000 transactions/s or 1MB/s. If the file is 8kb, that means 8MB/s. So we need 8 shards
 * Stream can deliver to Glue, which can transfom files into Parquet, and deliver to S3
 * Stream cannot convert files to Parquet on the fly
 * it can retain data, but minimum only for 24h
@@ -88,8 +90,7 @@ Consumers store checkpoints and processing status in DynamoDB. Inference results
 
 ### Data pipelines
 
-* ETL service to manage task dependencies. For example, it can move data from RDS to S3 weekly
-* ETL runs in EC2
+* ETL service (runs in EC2) to manage task dependencies. For example, it can move data from RDS to S3 weekly
 * Data sources might be on-premises
 * Highly available, retries and notifications on-failure
 
@@ -119,12 +120,11 @@ Can be used for storage for SageMaker instance, but only up to 16TB and it has n
 ## Feature engineering
 
 * tf-idf: term frequency, inverse document frequency
-  * Table dimensions: first axis is the amount of sentences, the other axis is the amount of *unique* unigrams + amount of unique bigrams, if that is what the analysis is based on.
-* SG ground truth: manages human labeling, dynamically creates a model so fewer samples have to be labeled in the future. Labels are still labeled by your team, not 3rd party people
+  * Table dimensions: first axis is the amount of sentences, the other axis is the amount of *unique* unigrams + amount of unique bigrams, if that is what the analysis is based on
 * Quantile-binning transformation: process to discover non-linearity in the variable's distribution by grouping observed values together
-* Orthogonal sparse bigram (OSB) transformation: alternative to the n-gram transformation
-* t-SNE (t-distributed stochastic neighbor embedding): non-linear dimensionality reduction algorithm, similar to PCA
+* t-SNE (t-distributed stochastic neighbor embedding): non-linear dimensionality reduction algorithm, similar to PCA (which is linear)
 * MICE (multiple imputations by chained equations): algorithm to deal with missing data in dataset, works with categorical values
+* SG ground truth: manages human labeling, dynamically creates a model so fewer samples have to be labeled in the future. Labels are still labeled by your team, not 3rd party people
 
 ## Sagemaker
 
@@ -133,15 +133,10 @@ Supported file formats:
 * For text: csv, libsvm
 * For images: jpg, png
 
-SG training can be hosted in :managed spot training: uses ec2 spot instances to run training jobs, reduces the cost while hhaving same time. to avoid restarting a training job from scratch if it's interrupted, implement checkpointing which saves the model in training at periodic intervals.
+---
 
-### Sagemaker notebook
-
-With lifecycle configuration, you can automate initial installation of libraries when creating a notebook.
-
-If you build a custom training container using a python training script that he developed on his local machine, then After copying the script to the location inside the container that is expected by SageMaker, you must define it as the script entry point in the SAGEMAKER_PROGRAM environment variable. When training starts, the interpreter executes the entry point defined by SAGEMAKER_PROGRAM.
-
-Spot instances can be used for training: it saves a lot of money but increases training time. Use checkpoints to S3 so training can resume in case the instance gets interrupted.
+* With lifecycle configuration, you can automate initial installation of libraries when creating a notebook
+* Spot instances can be used for training: it saves a lot of money but increases training time. Uses EC2, they checkpoint to S3 so training can resume in case the instance gets interrupted.
 
 ### Data input
 
@@ -153,14 +148,15 @@ Data input to SageMaker:
   * streams S3 data to the training container, improving the performance of training jobs
   * Accepts protobufIO format, not Parquet
   * Higher I/O
-  * you reduce the size of the EBS volumes of the training instances. to optimize, convert data into protobuf.recordIO.
+  * you reduce the size of the EBS volumes of the training instances. to optimize, convert data into protobuf.recordIO
   * It only needs to store the final model artifacts
 
 ### SageMaker built-in algorithms
 
-Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-built TF container, or build the new algorithm using TF Estimator
+Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-built TF container, or build the new algorithm using TF Estimator.
 
 * **Linear learner**
+  * For classification and regression
   * Preprocessing: automatically normalizes and shuffles data
   * Training: stochastic gradient descent, can select optimization algorithm, tunes L1 and L2 regularization
   * Trains multiple models in parallel and selects the most optimal one
@@ -173,6 +169,16 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
     * To prevent overfitting: use subsample and Eta, max_depth not too big
     * To help with unbalanced classes, use scale_pos_weight
   * Training can be parallelized across machines
+* **K-nearest-neighbors**
+  * Used for classification and regression
+  * Input: recordIO-protobuf or csv
+  * Train: CPU or GPU. Inference: CPU (lower latency) or GPU (higher throughput on large batches)
+* **Factorization machines**
+  * Supervised method, classification or regression to deal with sparse data
+  * Input: recordIO-protobuf with Float32. csv isn't practical for sparse data
+* **Collaborative filtering models**
+  * Recommender model
+  * leverages other user's experiences. users with similar tastes (based on observed user-item interactions) are likely to have similar interactions with items they haven't seen before. works better when there is a lot of data
 * **DeepAR**
   * Forecasting 1D time series data with RNNs. The same model is trained over several related time series. Finds frequencies and seasonality
   * Input is JSON format in Gzip or Parquet
@@ -181,20 +187,9 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
     * Middle filling: fills missing values between the item start and item end data of a data set
     * Back filling: fills missing values between the last recorded data point and the global end date of a dataset
     * Future filling: fills missing values between the global end date and the end of the forecast horizon
-* **K-nearest-neighbors**
-  * Used for classification and regression
-  * Input: recordIO-protobuf or csv
-  * Train: CPU or GPU. Inference: CPU (lower latency) or GPU (higher throughput on large batches)
 * **PCA**
   * Dimensionality reduction, unsupervised
   * Input: recordIO-protobuf or csv
-* **Factorization machines**
-  * Supervised method, classification or regression to deal with sparse data
-  * Useful when an item's target value depends on the other people's target values
-  * Input: recordIO-protobuf with Float32. csv isn't practical for sparse data
-* Collaborative filtering models
-  * Recommender model
-  * leverages other user's experiences. users with similar tastes (based on observed user-item interactions) are likely to have similar interactions with items they haven't seen before. works better when there is a lot of data
 * **IP insights**
   * Unsupervised learning of IP address usage patterns, identify suspicious behavior
   * Input: csv only
@@ -233,10 +228,10 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
   * Training: two input channels, two encoders (which network to choose is a hyperparam), and a comparator that decides the output label
   * Can only be trained on a single machine (CPU or GPU)
   * Use INFERENCE_PREFERRED_MODE envvar to optimize for encoder embeddings
-* Neural topic modeling
+* **Neural topic modeling**
   * unsupervised method to organize documents into topics
   * Input: recordIO-protobuf or csv. words must be tokenized into integers
-* Latent Dirichet Allocation (LDA)
+* **Latent Dirichet Allocation (LDA)**
   * Input: recordIO-protobuf or csv. Pipe mode only supported with recordIO
   * Training: single-instance CPU
 
@@ -278,7 +273,7 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
 * SG JumpStart: one-click models and algorithms from model zoos
 * SG Debugger
   * Stores gradients and tensors over time as model is trained
-  * Defines rules for detecting unwanted conditions while training.
+  * Defines rules for detecting unwanted conditions while training
     * Monitor system bottlenecks
     * Profile model framework operations
     * Debug model parameters
@@ -397,7 +392,7 @@ Amazon Lex Automated Chatbot Designer
   * Allows editorial control/curation
 * It can create recommendations for new users and new items that it hasn't seen before (the cold start problem). Just recommends popular items to new users. And for new items, they don't stay new for long, as soon as someone buys it, it starts building relationships to other items and Personalize recomputes this every two hours
 * Intelligent user segmentation, automatically classify users into groups for marketing campaigns
-* To maintain relevance, keep the dataset current: incremental data import. To do that real-time, use PutEvents API call to feed in real-time user behavior. Retrain the model, by default it updates every 2h. It should also do a full retrain (trainingMode=FULL) weekly.
+* To maintain relevance, keep the dataset current: incremental data import. To do that real-time, use PutEvents API call to feed in real-time user behavior. Retrain the model, by default it updates every 2h. It should also do a full retrain (trainingMode=FULL) weekly
 
 ### Other AI services
 
@@ -425,8 +420,10 @@ Amazon Lex Automated Chatbot Designer
 * rMSE
 * Residual plot: used for regression, shows how far away (positive or negative) the predicted value is compared to the expected value. Whether the model is underestimating or overestimating on the target
 * precision and recall, F1 score
-  * recall: tp / tp + fn
+  * precision: tp / (tp + fp)
+  * recall: tp / (tp + fn)
   * false negative rate: fn / (fn + tp)
+  * true negative rate: tn / (tn + fp)
 * ROC / AUC: AUC is area under the ROC curve
 * Correlation: negative correlation coefficient means the bigger the x, the lower the y
 
@@ -494,8 +491,11 @@ ENV SAGEMAKER_PROGRAM train.py
 
 ### Inference
 
+* Sagemaker endpoints are by default not open to the public and needs AWS credentials to access it. For open-to-the-public-endpoints, use API Gateway
+* Multi-model endpoint works for several models. They use a shared serving container which hosts several models. Improves endpoint utilization compared with using single-model endpoints, and reduces the deployment overhead. To increase availability, add SG instances of the same size and use the existing endpoint to host them
+* You can test out many models on live traffic using Production Variants, to distribute traffic among different models
 * In production you can set up automatic scaling: set a scaling policy to define target metrics, min/max capacity, cooldown periods
-* SG automatically tries to distribute instances across AZs, but for this to work you need more than one instance. For that, deploy multiple instances for each production endpoint and configure VPCs with at least 2 subnets, each in a different AZ
+* To have high availability with SG endpoints, deploy multiple instances for each production endpoint and configure VPCs with at least 2 subnets, each in a different AZ
 
 #### Elastic inference
 
@@ -530,9 +530,3 @@ ENV SAGEMAKER_PROGRAM train.py
   * SparkML can be run with Glue or EMR, it will be serialized into MLeap format
 * Can handle both real-time inference and batch transforms
   * Batch transform uesful for inference on the whole dataset. It can exclude attributes before running predictions. You can also join the prediction results with partial or entire input data attributes when using data that is in CSV, text, or JSON format
-
-#### SG Endpoint
-
-* Sagemaker endpoints are by default not open to the public and needs AWS credentials to access it. For open-to-the-public-endpoints, use API Gateway
-* Multi-model endpoint works for several models. They use a shared serving container which hosts several models. Improves endpoint utilization compared with using single-model endpoints, and reduces the deployment overhead. To increase availability, add SG instances of the same size and use the existing endpoint to host them
-* You can test out many models on live traffic using Production Variants, to distribute traffic among different models.
