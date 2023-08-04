@@ -2,15 +2,19 @@
 
 * [Sample questions from AWS](https://d1.awsstatic.com/training-and-certification/docs-ml/AWS-Certified-Machine-Learning-Specialty_Sample-Questions.pdf)
 * [Practice exam from AWS](https://explore.skillbuilder.aws/learn/course/external/view/elearning/12469/aws-certified-machine-learning-specialty-practice-question-set-mls-c01-english)
-* [Udemy course with practice exam](https://capgemini.udemy.com/course/aws-machine-learning-a-complete-guide-with-python/learn/quiz/4774522#overview)
-* [Udemy course with practice exam 2](https://capgemini.udemy.com/course/aws-certified-machine-learning-specialty-mls/)
+* [Udemy course with practice exam](https://udemy.com/course/aws-machine-learning-a-complete-guide-with-python/)
+* [Udemy course with practice exam 2](https://udemy.com/course/aws-certified-machine-learning-specialty-mls/)
 * [Udemy practice exams](https://udemy.com/course/aws-certified-machine-learning-specialty-full-practice-exams/)
-* [Udemy practice exam 2](https://capgemini.udemy.com/course/aws-machine-learning-practice-exam)
+* [Udemy practice exam 2](https://udemy.com/course/aws-machine-learning-practice-exam)
 * [Examtopics question dump](https://www.examtopics.com/exams/amazon/aws-certified-machine-learning-specialty/view/)
 
+## Table of contents
+
 - [AWS Machine Learning Specialty](#aws-machine-learning-specialty)
+  - [Table of contents](#table-of-contents)
   - [Data engineering](#data-engineering)
     - [S3](#s3)
+    - [Glue](#glue)
     - [Kinesis data streams](#kinesis-data-streams)
     - [Kinesis data firehose](#kinesis-data-firehose)
     - [Kinesis Video Stream](#kinesis-video-stream)
@@ -49,6 +53,7 @@
       - [Serverless inference](#serverless-inference)
       - [Inference recommender](#inference-recommender)
       - [Inference pipelines](#inference-pipelines)
+  - [Graphs](#graphs)
 
 
 ## Data engineering
@@ -60,9 +65,23 @@
 * SageMaker can only read from S3. If data is in DynamoDB, use data pipeline to export to S3 as JSON, and then converted to CSV
 * For sensitive data, use S3 KMS to encrypt and use Glue's sensitive data detection to redact PIIs and sensitive information, at cell and column level
 
+---
+
+* Data warehouse: only store structured data
+* Data lake: structured, semi-structured and unstructured data
+
+### Glue
+
+* Glue can de-duplicate data by using **FindMatches** ML as part of ETL
+* Glue cannot write the output in RecordIO-Protobuf. For ETL for this type of output, use EMR
+* Glue source input types: DocumentDB, Oracle, PostgreSQL -> Timestamp not accepted
+* Python Shell supports Glue jobs relying on libraries such as numpy, pandas and sklearn
+
 ### Kinesis data streams
 
 * One shard can handle up to 1000 transactions/s or 1MB/s. If the file is 8kb, that means 8MB/s. So we need 8 shards
+* number_of_shards = max(incoming_write_bandwidth_in_KB/1000, outgoing_read_bandwidth_in_KB/2000)
+  * Outgoing bandwidth also plays a role in determining number_of_shards
 * Stream can deliver to Glue, which can transfom files into Parquet, and deliver to S3
 * Stream cannot convert files to Parquet on the fly
 * it can retain data, but minimum only for 24h
@@ -97,7 +116,7 @@ Consumers store checkpoints and processing status in DynamoDB. Inference results
 ### AWS Batch
 
 * Serverless service to run batch jobs as Docker images
-* Dynamic provisioning of instances (EC2 and spot)
+* *Dynamic provisioning of instances (EC2 and spot)*
 * Automatically determines optimal quantity and type based on volume of jobs and requirements
 * Can schedule Batch jobs using CloudWatch events, or using Step functions
 
@@ -121,12 +140,27 @@ Can be used for storage for SageMaker instance, but only up to 16TB and it has n
 
 * tf-idf: term frequency, inverse document frequency
   * Table dimensions: first axis is the amount of sentences, the other axis is the amount of *unique* unigrams + amount of unique bigrams, if that is what the analysis is based on
-* Quantile-binning transformation: process to discover non-linearity in the variable's distribution by grouping observed values together
+* Quantile binning transformation: process to discover non-linearity in the variable's distribution by grouping observed values together
 * t-SNE (t-distributed stochastic neighbor embedding): non-linear dimensionality reduction algorithm, similar to PCA (which is linear)
 * MICE (multiple imputations by chained equations): algorithm to deal with missing data in dataset, works with categorical values
+* SMOTE: uses a k-nearest neighbours approach to exclude members of the majority class while in a similar way creating synthetic examples of a minority class
 * SG ground truth: manages human labeling, dynamically creates a model so fewer samples have to be labeled in the future. Labels are still labeled by your team, not 3rd party people
 
+---
+
+Batch size:
+
+* If bigger -> fewer batches -> faster training -> might get stuck in local minima ---> you should increase learning rate
+* If smaller -> helps optimization technique to jump local minima and explore other areas for global minima -> usually small learning rate, so slower training
+
+---
+
+* In an imbalanced dataset where there are more negative samples than positive, change the cost function so that false positives have a higher impact on the cost value than false negatives
+* K-fold cross validation: for imbalanced datasets, better to use stratified
+
 ## Sagemaker
+
+![ ](img/aws_machine_learning_specialty/overview.png)
 
 Supported file formats:
 
@@ -136,7 +170,17 @@ Supported file formats:
 ---
 
 * With lifecycle configuration, you can automate initial installation of libraries when creating a notebook
-* Spot instances can be used for training: it saves a lot of money but increases training time. Uses EC2, they checkpoint to S3 so training can resume in case the instance gets interrupted.
+* Spot instances can be used for training: it saves a lot of money but increases training time. Uses EC2, they checkpoint to S3 so training can resume in case the instance gets interrupted
+* Spot instances can be used to process anticipated traffic surges in the cheapest way when using EMR cluster. Use it for Spark task nodes only. Not for master and core nodes
+* For training instances: accelerated computing instances come with GPUs
+* Horovod: **distributed** DL framework for Tensorflow, keras, when we need several GPUs. Spark doesn't work with distributed training
+
+---
+
+Instance types:
+
+* M4, M5: for CPU
+* P3: for GPU
 
 ### Data input
 
@@ -155,30 +199,63 @@ Data input to SageMaker:
 
 Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-built TF container, or build the new algorithm using TF Estimator.
 
+* Sigmoid is used for **binary** classification methods where we only have 2 classes. Used for predicting a single label from a set of possible labels
+* Softmax applies to multiclass problems, returns the probability for each label, and the sum of all probabilities adds up to a 1. The class with the highest probability is used as the final class
+* If after more layers the model is not converging, there's a vanishing gradient because of multiplying small derivatives from all the layers. Instead of using sigmoid, use relu
+* L1 Regularization works by eliminating features that are not important
+* L2 Regularization keeps all the features but simply assigns a very small weight to features that are not important
+  * If model is underfitting (high error in training), reduce regularization
+
+---
+
+Required parameters before starting a SG built-in job
+
+* Provide the ARN of an IAM role that SageMaker can assume to perform tasks on your behalf
+* Specify the resources, ML compute instances, and ML storage volumes to deploy for model training
+* Specify the output path on an Amazon S3 bucket where the trained model will persist
+
+---
+
+To use a custom architecture:
+
+* Customize the SG container with your own code in TF framework, import it to ECR, use this for training
+* Bundle your own Docker container with TF Estimator loaded with the network you want, import it to ECR, use this for training
+
+---
+
+* Support vector machine
+  * can be used for classification or regression
+  * works with linear or non-linear problems
+  * For radial non-linear clustering problems, kNN can handle this too
+* Logistic regression
+  * classification algorithm for categorical variables
 * **Linear learner**
   * For classification and regression
-  * Preprocessing: automatically normalizes and shuffles data
+  * Preprocessing: automatically normalizes and **shuffles** data. Both these steps should be done before training
   * Training: stochastic gradient descent, can select optimization algorithm, tunes L1 and L2 regularization
   * Trains multiple models in parallel and selects the most optimal one
   * ContinuousParameterRanges of logarithmic helps with learning rates with a range that spans several orders of magnitude. For example, if you are tuning a linear learner model and you specify a range of values between .0001 and 1.0 for the learning_rate hyperparameter, searching uniformly on a logarithmic scale gives you a better sample of the entire range than searching on a linear scale would. This is because searching on a linear scale would, on average, devote 90 percent of your training budget to only the values between .1 and 1.0, leaving only 10 percent of your training budget for the values between .0001 and .1
+    * Logarithmic ranges tend to find optimal values more quickly than linear ranges
 * **XGBoost**
   * Input can be recordIO-protobuf, parquet, csv
   * Models are de/serialized with pickle
+  * CSVs must not have a column header record, and target variable must be the first column
   * Can be used as framework within notebooks, or as a built-in sagemaker algorithm
   * Difficult to tune all of its hyperparameters
-    * To prevent overfitting: use subsample and Eta, max_depth not too big
-    * To help with unbalanced classes, use scale_pos_weight
+    * To prevent overfitting: use **subsample** and Eta, max_depth not too big
+    * To help with imbalanced classes, use scale_pos_weight
   * Training can be parallelized across machines
+  * Automatically handles correlated features, numeric features on a different scale, and numeric-categorical variables
+  * Has a lower and upper bound it can predict for regression, which is determined based on the range of values seen in the training. Tree-based algorithms do the same. Linear regression and neural networks don't do this
 * **K-nearest-neighbors**
   * Used for classification and regression
   * Input: recordIO-protobuf or csv
   * Train: CPU or GPU. Inference: CPU (lower latency) or GPU (higher throughput on large batches)
 * **Factorization machines**
   * Supervised method, classification or regression to deal with sparse data
-  * Input: recordIO-protobuf with Float32. csv isn't practical for sparse data
-* **Collaborative filtering models**
-  * Recommender model
-  * leverages other user's experiences. users with similar tastes (based on observed user-item interactions) are likely to have similar interactions with items they haven't seen before. works better when there is a lot of data
+  * Used for building recommender systems and for collaborative filtering
+    * leverages other user's experiences. users with similar tastes (based on observed user-item interactions) are likely to have similar interactions with items they haven't seen before. works better when there is a lot of data
+  * Input: recordIO-protobuf with *float32*. csv isn't practical for sparse data
 * **DeepAR**
   * Forecasting 1D time series data with RNNs. The same model is trained over several related time series. Finds frequencies and seasonality
   * Input is JSON format in Gzip or Parquet
@@ -189,6 +266,8 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
     * Future filling: fills missing values between the global end date and the end of the forecast horizon
 * **PCA**
   * Dimensionality reduction, unsupervised
+  * regular: For datasets with sparse data and a moderate number of observations and features
+  * randomized: For datasets with both a large number of observations and features
   * Input: recordIO-protobuf or csv
 * **IP insights**
   * Unsupervised learning of IP address usage patterns, identify suspicious behavior
@@ -200,7 +279,7 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
   * Define hyperparams and ranges, and metrics you're optimizing for
   * Sagemaker creates a HyperParameter tuning job that trains as many combinations as you decide. The set of hyperparams producing the best results can be deployed as a model
   * Don't optimize too many hyperparams at once. Limit your ranges to as small a range as possible
-  * Don't run too many training jobs concurrently
+  * Don't run too many training jobs concurrently. Ideally one
 * **AutoML**
   * Load csv input data from S3 and select target column
   * Automatic preprocessing and model creation, model notebook is available
@@ -215,25 +294,30 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
 
 * **Seq2seq**
   * Used to generate text as output
-  * Input: recordIO-protobuf, tokens must be integers. Text files must be tokenized
+  * Input: recordIO-protobuf with integer tokens. Text files must be tokenized
   * Input data must contain training and val data and vocabulary file
   * Pre-trained models and public datasets are available
   * Training can onle be done in one machine
 * **BlazingText**
   * Supervised method for text classification. Uses word2vec
+  * Each line should start with `__label__mouse` (label immediately appended to prefix), and tokens within the sentence should be space separated
+  * The order of the words doesn't matter because it uses skip-gram and continuous bag of words
 * **Object2vec**
   * Similar to word2vec but for arbitrary objects, like sentences with labels
   * Creates low-dimensional embedding layer
+  * Can be used to find similarity between different texts
   * Input: data must be tokenized into integers. Training data consists of pairs of tokens and/or sequences of tokens
   * Training: two input channels, two encoders (which network to choose is a hyperparam), and a comparator that decides the output label
   * Can only be trained on a single machine (CPU or GPU)
   * Use INFERENCE_PREFERRED_MODE envvar to optimize for encoder embeddings
 * **Neural topic modeling**
-  * unsupervised method to organize documents into topics
+  * Unsupervised method to organize documents into topics
   * Input: recordIO-protobuf or csv. words must be tokenized into integers
 * **Latent Dirichet Allocation (LDA)**
+  * Unsupervised
   * Input: recordIO-protobuf or csv. Pipe mode only supported with recordIO
-  * Training: single-instance CPU
+  * Training: *single-instance CPU*
+  * Observations: documents. Feature set: vocabulary. Feature: word. Output categories: topics
 
 ### Images algorithms
 
@@ -254,16 +338,19 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
   * Input: recordIO-protobuf or csv. Optional test channel for computing accuracy, precision, recall and F1
   * No GPU
 * **K-means clustering**
-  * Input: recordIO-protobuf or csv.
+  * Input: recordIO-protobuf or csv
   * CPU and GPU, but CPU recommended
+  * To find the optimal value of k: use the "elbow method" on a plot of the total within-cluster sum of squares (WSS) as a function of k
+  * Can be used as dimensionality reduction
 
 ### Apache Spark & Sagemaker
 
+* Spark is used to parallelize pre-processing of big data on SG: sagemaker-spark package to integrate both, or do it separately: first pre-process in EMR, store in s3, take it from there for SG
+* Use sagemaker_pyspark and the model's SageMakerEstimator if you want to use Spark for pre-processing, but you still want it to run in SG
 * Allows combining pre-processing big data in Spark with training and inference in SageMaker
-* pre-processes data as normal with Spark, generating DataFrames
-* Uses sagemaker-spark library: SageMakerEstimators like KMeans, PCA, XGBoost and SageMakerModels
 * You can connect notebook to a remote EMR cluster running Spark, or use Zeppelin
 * Training df should have: feature column that's a vector of doubles, and optional labels column of Doubles. Then call fit() on SGEstimator to get a SGModel. Call transform() on SGModel to make inferences. This works with Spark Pipelines as well
+  * To run the .fit() locally, provide instance_type="local" when initiating the Estimator
 
 ### Sagemaker tools
 
@@ -354,7 +441,11 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
   * Objects/people/celebrities marked on timeline, people pathing
 * Images come from S3, or provide image bytes as part of request
 * Video must come from Kinesis Video Streams: H.264 encoded, 5-30FPS
-* Supports custom labels, you can provide a small set of labeled images. Use your own labels for unique items
+* Supports custom labels, you can provide a small set of labeled images. You can start with only 10 images
+* Typical workflow
+  1. Video uploaded and stored in data lake
+  2. Lambda triggered, create metadata for celebrities, emotions, using rekognition video and transcribe
+  3. Output is sent to Opensearch
 
 ### Forecast
 
@@ -365,11 +456,13 @@ Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-b
 ### Lex
 
 * Chatbot engine
+  * Handles speech-to-text and chatbot logic. No comprehend needed
 * Utterances invoke intents ("I want to oder a pizza")
+  * For more complex text, if you need text processing, Lex integrates with Comprehend
 * Lambda functions are invoked to fulfill the intent
 * Slots specify extra information needed by the intent (pizza size, toppings etc.). Has to be coded
 * Can be deployed to AWS Mobile SDK, Facebook Messenger, Slack, Twilio
-* Alexa uses Transcribe and Polly for text-to-speech and speech-to-text
+* Alexa uses Transcribe and Polly
 
 Amazon Lex Automated Chatbot Designer
 
@@ -419,15 +512,37 @@ Amazon Lex Automated Chatbot Designer
 * Confusion matrix
 * rMSE
 * Residual plot: used for regression, shows how far away (positive or negative) the predicted value is compared to the expected value. Whether the model is underestimating or overestimating on the target
-* precision and recall, F1 score
+* Formulas
+  * f1-score: 2 * precision * recall / (precision + recall)
   * precision: tp / (tp + fp)
   * recall: tp / (tp + fn)
+    * Important when the cost of a fn is higher than that of a fp
+    * For multiclass, total recall = sum(recall for each class)/#classes
   * false negative rate: fn / (fn + tp)
-  * true negative rate: tn / (tn + fp)
-* ROC / AUC: AUC is area under the ROC curve
+  * true negative rate / specificity: tn / (tn + fp). If high, means that there are few fp
+* Number of positive samples: tp + fn
+* Number of negative samples: tn + fp
+* ROC / AUC: AUC is area under the ROC curve. Good when we want to check the positive class performance (good for imbalanced datasets)
+  * if ROC is a straight line, then AUC=0.5, model is just random. a good result should have a ROC curve like a logarithmic curve towards 1
+  * ROC compares the true positive rate and the false positive rate at different thresholds
 * Correlation: negative correlation coefficient means the bigger the x, the lower the y
 
 ## ML implementation and operations
+
+Steps to deploy:
+
+* Create model. Include:
+  * S3 path where the model artifacts are stored
+  * Docker registry path for the image that contains the inference code
+* Create endpoint configuration
+* Create endpoint
+
+Deployment types:
+
+* Canary: releases the new version to a small set of users, then gradually increases its traffic. So, traffic at the beginning is 0:1, then begins to update periodically. This mitigates the risk of changes to the production
+* A/B
+* Blue/Green: create two separate, but identical environments -> two endpoints. One environment (blue) is running the current application version and one environment (green) is running the new application version. Increases application availability and reduces deployment risk by simplifying the rollback process if a deployment fails. Once testing has been completed on the green environment, live application traffic is directed to the green environment and the blue environment is deprecated
+* Rolling
 
 ### Docker
 
@@ -467,6 +582,17 @@ COPY train.py /opt/ml/code/train.py
 ENV SAGEMAKER_PROGRAM train.py
 ```
 
+Custom inference containers have following restrictions:
+
+* Accept all socket connections within 250ms
+* Respond to both /invocations and /ping on port 8080
+* Respond to ping within 2s
+* Model artifacts should be in **tar** format
+
+---
+
+* If you plan to use GPU, make sure container is nvidia-docker compatible. Only CUDA toolkit should be included in the container, not the NVIDIA drivers
+
 ### SageMaker on the Edge
 
 * **Neo**
@@ -484,22 +610,42 @@ ENV SAGEMAKER_PROGRAM train.py
 
 ### Security
 
+* SG supports authorization based on resource tags
+  * Doesn't support resource-based policies
+* With IAM identity-based policies, you can specify allowed/denied actions and resources as well as the condition under which actions are allowed/denied for SG
 * All files in `/opt/ml/` and `/tmp/` can be encrypted with a KMS key
 * In transit, *inter-node training communication* can be encrypted, via console or API when setting up a training/tuning job, which requires the creation of a VPC. Increases training time eand cost. Complies with regulatory requirements
-* Notebooks are Internet-enabled by default, which can be a security issue. If you disable this, the VPC needs an interface endpoint (PrivateLink) or NAT Gateway and allow outbound connections
-* Training and Inference containers are also Internet-enabled by default. Network isolation is possible but this also prevents S3 access
+* Notebooks, training and inference containers are Internet-enabled by default, which can be a security issue. If you disable this, the VPC needs an interface endpoint (PrivateLink) or NAT Gateway and allow outbound connections. This prevents S3 access
+* Notebooks with default IAM role have automatic access to S3 buckets whose name contains "sagemaker"
+* To connect to AWS endpoint from a VPC, use VPC **interface endpoint** using PrivateLink for private connectivity
+
+---
+
+Cloudtrail
+
+* does not monitor calls to SG InvokeEndpoint
+* Provides a record of actions taken by an user/role/service in SG
+* Records are kept for 90 days
+* CloudWatch keeps the SG monitoring statistics for 15 months. But console limits the search to metrics that were updated in the last 2 weeks
+
+---
+
+To provide access to SG resources:
+
+* Provide access to externally authenticated users through identity federation
+* Create a role to delegate access to your resources with the 3rd party AWS account
 
 ### Inference
 
 * Sagemaker endpoints are by default not open to the public and needs AWS credentials to access it. For open-to-the-public-endpoints, use API Gateway
 * Multi-model endpoint works for several models. They use a shared serving container which hosts several models. Improves endpoint utilization compared with using single-model endpoints, and reduces the deployment overhead. To increase availability, add SG instances of the same size and use the existing endpoint to host them
-* You can test out many models on live traffic using Production Variants, to distribute traffic among different models
-* In production you can set up automatic scaling: set a scaling policy to define target metrics, min/max capacity, cooldown periods
+* You can test out many models on live traffic using **production variants**, to distribute traffic among different models
+* Automatic scaling: set a scaling policy to define target metrics, min/max capacity, cooldown periods
 * To have high availability with SG endpoints, deploy multiple instances for each production endpoint and configure VPCs with at least 2 subnets, each in a different AZ
 
 #### Elastic inference
 
-* To accelerate inference, cheaper than using a GPU instance
+* To reduce inference latency, cheaper than using a GPU instance
 * Only works for Tensorflow, PyTorch and MXNet pre-built containers. ONNX can be used to export models to MXNet
 * Only works with custom containers built with EI-enabled Tensorflow, PyTorch or MXNet
 * Only works with image classification and object detection built-in algorithms
@@ -530,3 +676,8 @@ ENV SAGEMAKER_PROGRAM train.py
   * SparkML can be run with Glue or EMR, it will be serialized into MLeap format
 * Can handle both real-time inference and batch transforms
   * Batch transform uesful for inference on the whole dataset. It can exclude attributes before running predictions. You can also join the prediction results with partial or entire input data attributes when using data that is in CSV, text, or JSON format
+
+## Graphs
+
+* To see geographical data: heatmap
+* To spot outliers: box plot, histogram, scatter plot

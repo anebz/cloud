@@ -90,6 +90,7 @@ Partition by session ID, not timestamp, since date is associated by time and not
   * Use case: low throughput, hig latency, simple API, Lambda
   * PutRecord: for one, PutRecords: for many, uses batching, increases throughput, fewer HTTP requests
 * KPL (kinesis producer library)
+  * Useful when wishing high throughput and cost saving because it has aggregation, which reduces the API calls
   * C++/Java library
     * If errors in the Java application result in data loss, modify the Java application code to use idempotent processing by pointing the shard iterator to the shard position before the application error occurred.
   * Use case: high performance, long-running projects. Automated and configurable retry mechanism
@@ -1115,7 +1116,7 @@ Data sources:
 * Accelerates interactive queries on large datasets
 * Each user gets 10GB of SPICE
 * In direct query mode, using Athena, some queries might time out. Good use for SPICE. If it takes >30mins to import data from Athena into SPICE, that means big queries are timing out.
-  
+
 Datasets can be refreshed on a Daily, Weekly, or Monthly basis, but not faster. for that, use Kibana
 
 > Visualization types
