@@ -4,7 +4,7 @@
 * [Practice exam from AWS](https://explore.skillbuilder.aws/learn/course/external/view/elearning/12469/aws-certified-machine-learning-specialty-practice-question-set-mls-c01-english)
 * [Udemy course with practice exam](https://udemy.com/course/aws-machine-learning-a-complete-guide-with-python/)
 * [Udemy course with practice exam 2](https://udemy.com/course/aws-certified-machine-learning-specialty-mls/)
-* [Udemy practice exams](https://udemy.com/course/aws-certified-machine-learning-specialty-full-practice-exams/)
+* [Udemy practice exams](https://udemy.com/course/aws-certified-machine-learning-specialty-full-practice-exams/) (difficult)
 * [Udemy practice exam 2](https://udemy.com/course/aws-machine-learning-practice-exam)
 * [Examtopics question dump](https://www.examtopics.com/exams/amazon/aws-certified-machine-learning-specialty/view/)
 
@@ -32,7 +32,6 @@
     - [Clustering algorithms](#clustering-algorithms)
     - [Apache Spark \& Sagemaker](#apache-spark--sagemaker)
     - [Sagemaker tools](#sagemaker-tools)
-    - [Pre-training bias metrics in Clarify](#pre-training-bias-metrics-in-clarify)
   - [High-level AI services](#high-level-ai-services)
     - [Comprehend](#comprehend)
     - [Translate](#translate)
@@ -43,27 +42,25 @@
     - [Lex](#lex)
     - [Personalize](#personalize)
     - [Other AI services](#other-ai-services)
+    - [SageMaker on the Edge](#sagemaker-on-the-edge)
   - [Evaluation](#evaluation)
   - [ML implementation and operations](#ml-implementation-and-operations)
     - [Docker](#docker)
-    - [SageMaker on the Edge](#sagemaker-on-the-edge)
-    - [Security](#security)
     - [Inference](#inference)
       - [Elastic inference](#elastic-inference)
       - [Serverless inference](#serverless-inference)
       - [Inference recommender](#inference-recommender)
       - [Inference pipelines](#inference-pipelines)
-  - [Graphs](#graphs)
+  - [Security](#security)
 
 
 ## Data engineering
 
 ### S3
 
-* S3 Analytics: gives recommendations to when to transition objects to the right storage class. Only works for Standard and Standard IA. Creates a report daily
+* S3 Analytics: gives recommendations to when to transition objects to the right storage class. Only works for Standard and Standard IA. Creates a daily report
 * Amazon FSx for Lustre: used to serve S3 training data to SageMaker, speeds up training and setup
 * SageMaker can only read from S3. If data is in DynamoDB, use data pipeline to export to S3 as JSON, and then converted to CSV
-* For sensitive data, use S3 KMS to encrypt and use Glue's sensitive data detection to redact PIIs and sensitive information, at cell and column level
 
 ---
 
@@ -72,7 +69,8 @@
 
 ### Glue
 
-* Glue can de-duplicate data by using **FindMatches** ML as part of ETL
+* **FindMatches** ML: de-duplicate data during ETL
+* Can detect sensitive data and redact PIIs and sensitive information, at cell and column level
 * Glue cannot write the output in RecordIO-Protobuf. For ETL for this type of output, use EMR
 * Glue source input types: DocumentDB, Oracle, PostgreSQL -> Timestamp not accepted
 * Python Shell supports Glue jobs relying on libraries such as numpy, pandas and sklearn
@@ -140,23 +138,48 @@ Can be used for storage for SageMaker instance, but only up to 16TB and it has n
 
 * tf-idf: term frequency, inverse document frequency
   * Table dimensions: first axis is the amount of sentences, the other axis is the amount of *unique* unigrams + amount of unique bigrams, if that is what the analysis is based on
+  * If one word appears in all sentences, idf = log(1) = 0 -> tf-idf = 0
 * Quantile binning transformation: process to discover non-linearity in the variable's distribution by grouping observed values together
 * t-SNE (t-distributed stochastic neighbor embedding): non-linear dimensionality reduction algorithm, similar to PCA (which is linear)
 * MICE (multiple imputations by chained equations): algorithm to deal with missing data in dataset, works with categorical values
 * SMOTE: uses a k-nearest neighbours approach to exclude members of the majority class while in a similar way creating synthetic examples of a minority class
 * SG ground truth: manages human labeling, dynamically creates a model so fewer samples have to be labeled in the future. Labels are still labeled by your team, not 3rd party people
 
----
-
 Batch size:
 
 * If bigger -> fewer batches -> faster training -> might get stuck in local minima ---> you should increase learning rate
 * If smaller -> helps optimization technique to jump local minima and explore other areas for global minima -> usually small learning rate, so slower training
 
+Machine learning:
+
+* Sigmoid is used for **binary** classification
+* Softmax applies to multiclass problems, returns the probability for each label, and the sum of all probabilities adds up to a 1
+* If after more layers the model is not converging, there's a vanishing gradient because of multiplying small derivatives from all the layers. Instead of using sigmoid, use relu
+* L1 Regularization works by eliminating features that are not important
+* L2 Regularization keeps all the features but simply assigns a very small weight to features that are not important
+  * If model is underfitting (high error in training), reduce regularization
+* If model is underfitting
+  * Add more features
+  * Reduce regularization
+* If model is overfitting
+  * Reduce features
+  * Add regularization
+  * Add dropout
+  * Add early stopping
+  * Add more training data
+* How to handle outliers in data
+  * Logarithmic transformation (normalizes in log)
+  * Robust standardization (scales values taking the standard deviation into account)
+
 ---
 
 * In an imbalanced dataset where there are more negative samples than positive, change the cost function so that false positives have a higher impact on the cost value than false negatives
 * K-fold cross validation: for imbalanced datasets, better to use stratified
+
+Graphs
+
+* To see geographical data: heatmap
+* To spot outliers: box plot, histogram, scatter plot
 
 ## Sagemaker
 
@@ -167,20 +190,16 @@ Supported file formats:
 * For text: csv, libsvm
 * For images: jpg, png
 
----
+Instance types:
+
+* M4, M5: for CPU
+* P3: for GPU
 
 * With lifecycle configuration, you can automate initial installation of libraries when creating a notebook
 * Spot instances can be used for training: it saves a lot of money but increases training time. Uses EC2, they checkpoint to S3 so training can resume in case the instance gets interrupted
 * Spot instances can be used to process anticipated traffic surges in the cheapest way when using EMR cluster. Use it for Spark task nodes only. Not for master and core nodes
 * For training instances: accelerated computing instances come with GPUs
 * Horovod: **distributed** DL framework for Tensorflow, keras, when we need several GPUs. Spark doesn't work with distributed training
-
----
-
-Instance types:
-
-* M4, M5: for CPU
-* P3: for GPU
 
 ### Data input
 
@@ -190,36 +209,23 @@ Data input to SageMaker:
   * Uses disk space to store both final model artifacts and full training dataset
 * Pipe mode
   * streams S3 data to the training container, improving the performance of training jobs
-  * Accepts protobufIO format, not Parquet
+  * Accepts protobuf.recordIO format, not Parquet
   * Higher I/O
   * you reduce the size of the EBS volumes of the training instances. to optimize, convert data into protobuf.recordIO
   * It only needs to store the final model artifacts
 
 ### SageMaker built-in algorithms
 
-Built-in SG algorithms can't be edited. To use another algorithm, extend a pre-built TF container, or build the new algorithm using TF Estimator.
+Built-in SG algorithms can't be edited. To use a custom architecture:
 
-* Sigmoid is used for **binary** classification methods where we only have 2 classes. Used for predicting a single label from a set of possible labels
-* Softmax applies to multiclass problems, returns the probability for each label, and the sum of all probabilities adds up to a 1. The class with the highest probability is used as the final class
-* If after more layers the model is not converging, there's a vanishing gradient because of multiplying small derivatives from all the layers. Instead of using sigmoid, use relu
-* L1 Regularization works by eliminating features that are not important
-* L2 Regularization keeps all the features but simply assigns a very small weight to features that are not important
-  * If model is underfitting (high error in training), reduce regularization
+* Customize the SG container with your own code in TF framework, import it to ECR, use it for training
+* Bundle your own Docker container with TF Estimator loaded with the network you want, import it to ECR, use it for training
 
----
-
-Required parameters before starting a SG built-in job
+Required parameters before starting a SG built-in job:
 
 * Provide the ARN of an IAM role that SageMaker can assume to perform tasks on your behalf
 * Specify the resources, ML compute instances, and ML storage volumes to deploy for model training
 * Specify the output path on an Amazon S3 bucket where the trained model will persist
-
----
-
-To use a custom architecture:
-
-* Customize the SG container with your own code in TF framework, import it to ECR, use this for training
-* Bundle your own Docker container with TF Estimator loaded with the network you want, import it to ECR, use this for training
 
 ---
 
@@ -230,11 +236,10 @@ To use a custom architecture:
 * Logistic regression
   * classification algorithm for categorical variables
 * **Linear learner**
-  * For classification and regression
+  * For classification and regression. Trains multiple models in parallel and selects the most optimal one
   * Preprocessing: automatically normalizes and **shuffles** data. Both these steps should be done before training
   * Training: stochastic gradient descent, can select optimization algorithm, tunes L1 and L2 regularization
-  * Trains multiple models in parallel and selects the most optimal one
-  * ContinuousParameterRanges of logarithmic helps with learning rates with a range that spans several orders of magnitude. For example, if you are tuning a linear learner model and you specify a range of values between .0001 and 1.0 for the learning_rate hyperparameter, searching uniformly on a logarithmic scale gives you a better sample of the entire range than searching on a linear scale would. This is because searching on a linear scale would, on average, devote 90 percent of your training budget to only the values between .1 and 1.0, leaving only 10 percent of your training budget for the values between .0001 and .1
+  * ContinuousParameterRanges of logarithmic helps with learning rates with a range that spans several orders of magnitude. For example, if you specify a range of values between .0001 and 1.0 for the learning_rate, searching uniformly on a logarithmic scale gives you a better sample of the entire range than searching on a linear scale, because this would, on average, devote 90 percent of your training budget to only the values between .1 and 1.0, leaving only 10 percent of your training budget for the values between .0001 and .1
     * Logarithmic ranges tend to find optimal values more quickly than linear ranges
 * **XGBoost**
   * Input can be recordIO-protobuf, parquet, csv
@@ -271,6 +276,7 @@ To use a custom architecture:
   * Input: recordIO-protobuf or csv
 * **IP insights**
   * Unsupervised learning of IP address usage patterns, identify suspicious behavior
+  * Can be used for fraud detection
   * Input: csv only
 * **Reinforcement learning**
   * Uses deep learning framework with Tensorflow and MXNet
@@ -297,7 +303,7 @@ To use a custom architecture:
   * Input: recordIO-protobuf with integer tokens. Text files must be tokenized
   * Input data must contain training and val data and vocabulary file
   * Pre-trained models and public datasets are available
-  * Training can onle be done in one machine
+  * Training can only be done in one machine
 * **BlazingText**
   * Supervised method for text classification. Uses word2vec
   * Each line should start with `__label__mouse` (label immediately appended to prefix), and tokens within the sentence should be space separated
@@ -335,6 +341,7 @@ To use a custom architecture:
 ### Clustering algorithms
 
 * **Random cut forest**
+  * Algorithm to find anomalies. Used in Kinesis data analytics
   * Input: recordIO-protobuf or csv. Optional test channel for computing accuracy, precision, recall and F1
   * No GPU
 * **K-means clustering**
@@ -373,30 +380,13 @@ To use a custom architecture:
   * Monitoring types:
     * Model is overfitting
     * Data quality drift
-    * Drift in model quality
     * Bias drift
     * Feature attribution drift (compares feature ranking of training vs. live data)
-  * Data stored in S3 and metrics are in CloudWatch
+  * Data stored in S3 and metrics in CloudWatch
   * Integration with Tensorboard, QuickSight, Tableau, or just visualize with SGStudio
 * SG Canvas
   * No-code tool to build ML models
   * Upload csv data from S3, select column to predict, build and make predictions. Can do classification and regression, it does automatic data cleaning (missing values, outliers, duplicates) and shares models and datasets with SG Studio
-
-### Pre-training bias metrics in Clarify
-
-* Class imbalance (CI)
-* Difference in proportions of labels (DPL)
-  * Imbalance of positive outcomes between facet values
-* Kullback-Leibler Divergence (KL), Jensen-Shannon Divergence (JS)
-  * How much outcome distributions of facets diverge
-* LP-norm (LP)
-  * P-norm difference between distributions of outcomes from facets
-* Total variation distance (TVD)
-  * L1-norm difference between distributions of outcomes from facets
-* Kolmogorov-Smirnov (KS)
-  * Maximum divergence between outcomes in distributions from facets
-* Conditional demographic disparity (CDD)
-  * Disparity of outcomes between facets as a whole, and by subgroups
 
 ## High-level AI services
 
@@ -460,7 +450,7 @@ To use a custom architecture:
 * Utterances invoke intents ("I want to oder a pizza")
   * For more complex text, if you need text processing, Lex integrates with Comprehend
 * Lambda functions are invoked to fulfill the intent
-* Slots specify extra information needed by the intent (pizza size, toppings etc.). Has to be coded
+* *Slots* specify extra information needed by the intent (pizza size, toppings etc.). Has to be coded
 * Can be deployed to AWS Mobile SDK, Facebook Messenger, Slack, Twilio
 * Alexa uses Transcribe and Polly
 
@@ -495,7 +485,7 @@ Amazon Lex Automated Chatbot Designer
 * Fraud detector: upload historical fraud data. It builds custom model from a template you choose. It accesses the risk based on if the account is new, guest checkout, "try before you buy" abuse, or online payments
 * Contact Lens for Connect: contact lenses made for customer support call centers. Ingests audio from recorded phone calls. Allows search on calls and chats
 * Kendra: Enterprise search for intranet with NLP. Combines data from filesystems, SharePoint, intranet, into one searchable repository
-* Augmented AI (A2I): human review of ML *predictions*. Builds workflows for reviewing low-confidence predictions by leveraging the Mechanical Turk workforce
+* Augmented AI (A2I): human review of ML *predictions*. Builds workflows for reviewing low-confidence predictions by leveraging the Mechanical Turk workforce. MTurk uses humans so it is slow
 
 * DeepLens: research tool, DL-enabled video camera. Not suitable for commercial uses or surveillance camera. not designed to be mounted on walls, ceilings, posts
 * Panorama: CV at the edge, at IP cameras. low latency than sending predictions to the cloud
@@ -507,13 +497,27 @@ Amazon Lex Automated Chatbot Designer
 * Lookout: anomaly detection from sensor data to detect equipment/metrics/vision issues
 * Monitron: industrial equiment monitoring and predictive maintenance. Provides sensors, gateways, service and app
 
+### SageMaker on the Edge
+
+* **Neo**
+  * Machine Learning for edge devices: ARM, Intel, Nvidia, can be embedded in anything
+  * Optimizes code for specific devices: tensorflow, MXNet, PyTorch, ONNX, XGBoost
+  * Consists of a compiler and a runtime
+* **Greengrass**
+  * Neo-compiled models can be deployed to an HTTPS endpoint
+    * Hosted on C5, M5, M4, P3 or P2 instances
+    * Must be the same instance type used for compilation
+  * Or you can deploy model to IoT Greengrass, without Neo
+    * Inference at the edge with local data, using model trained in the cloud
+    * Uses Lambda inference applications
+
 ## Evaluation
 
 * Confusion matrix
 * rMSE
 * Residual plot: used for regression, shows how far away (positive or negative) the predicted value is compared to the expected value. Whether the model is underestimating or overestimating on the target
 * Formulas
-  * f1-score: 2 * precision * recall / (precision + recall)
+  * f1-score: 2 * precision * recall / (precision + recall). gives same importance to both classes
   * precision: tp / (tp + fp)
   * recall: tp / (tp + fn)
     * Important when the cost of a fn is higher than that of a fp
@@ -525,6 +529,7 @@ Amazon Lex Automated Chatbot Designer
 * ROC / AUC: AUC is area under the ROC curve. Good when we want to check the positive class performance (good for imbalanced datasets)
   * if ROC is a straight line, then AUC=0.5, model is just random. a good result should have a ROC curve like a logarithmic curve towards 1
   * ROC compares the true positive rate and the false positive rate at different thresholds
+* Precision - AUC: for imbalanced datasets, where we care more about the positive class
 * Correlation: negative correlation coefficient means the bigger the x, the lower the y
 
 ## ML implementation and operations
@@ -539,10 +544,10 @@ Steps to deploy:
 
 Deployment types:
 
-* Canary: releases the new version to a small set of users, then gradually increases its traffic. So, traffic at the beginning is 0:1, then begins to update periodically. This mitigates the risk of changes to the production
-* A/B
+* Canary: releases the new version to a small set of users, then gradually increases traffic to more and more users. So, traffic at the beginning is 0:1, then begins to update periodically. This mitigates the risk of changes to the production. you can choose which users to direct to the new version
+* Rolling: similar to canary, but starts deploying to servers and not to users.
+* A/B: to test something new, it might start with 80-20, 60-40. that means automatically 20 or 40% of users get new version. in canary it goes gradually
 * Blue/Green: create two separate, but identical environments -> two endpoints. One environment (blue) is running the current application version and one environment (green) is running the new application version. Increases application availability and reduces deployment risk by simplifying the rollback process if a deployment fails. Once testing has been completed on the green environment, live application traffic is directed to the green environment and the blue environment is deprecated
-* Rolling
 
 ### Docker
 
@@ -582,6 +587,8 @@ COPY train.py /opt/ml/code/train.py
 ENV SAGEMAKER_PROGRAM train.py
 ```
 
+All files in `/opt/ml/` and `/tmp/` can be encrypted with a KMS key
+
 Custom inference containers have following restrictions:
 
 * Accept all socket connections within 250ms
@@ -589,51 +596,7 @@ Custom inference containers have following restrictions:
 * Respond to ping within 2s
 * Model artifacts should be in **tar** format
 
----
-
-* If you plan to use GPU, make sure container is nvidia-docker compatible. Only CUDA toolkit should be included in the container, not the NVIDIA drivers
-
-### SageMaker on the Edge
-
-* **Neo**
-  * Machine Learning for edge devices: ARM, Intel, Nvidia, can be embedded in anything
-  * Optimizes code for specific devices: tensorflow, MXNet, PyTorch, ONNX, XGBoost
-  * "Run ML models anywhere with up to 25x better performance"
-  * Consists of a compiler and a runtime
-* **Greengrass**
-  * Neo-compiled models can be deployed to an HTTPS endpoint
-    * Hosted on C5, M5, M4, P3 or P2 instances
-    * Must be the same instance type used for compilation
-  * Or you can deploy model to IoT Greengrass, without Neo
-    * Inference at the edge with local data, using model trained in the cloud
-    * Uses Lambda inference applications
-
-### Security
-
-* SG supports authorization based on resource tags
-  * Doesn't support resource-based policies
-* With IAM identity-based policies, you can specify allowed/denied actions and resources as well as the condition under which actions are allowed/denied for SG
-* All files in `/opt/ml/` and `/tmp/` can be encrypted with a KMS key
-* In transit, *inter-node training communication* can be encrypted, via console or API when setting up a training/tuning job, which requires the creation of a VPC. Increases training time eand cost. Complies with regulatory requirements
-* Notebooks, training and inference containers are Internet-enabled by default, which can be a security issue. If you disable this, the VPC needs an interface endpoint (PrivateLink) or NAT Gateway and allow outbound connections. This prevents S3 access
-* Notebooks with default IAM role have automatic access to S3 buckets whose name contains "sagemaker"
-* To connect to AWS endpoint from a VPC, use VPC **interface endpoint** using PrivateLink for private connectivity
-
----
-
-Cloudtrail
-
-* does not monitor calls to SG InvokeEndpoint
-* Provides a record of actions taken by an user/role/service in SG
-* Records are kept for 90 days
-* CloudWatch keeps the SG monitoring statistics for 15 months. But console limits the search to metrics that were updated in the last 2 weeks
-
----
-
-To provide access to SG resources:
-
-* Provide access to externally authenticated users through identity federation
-* Create a role to delegate access to your resources with the 3rd party AWS account
+If you plan to use GPU, make sure container is nvidia-docker compatible. Only CUDA toolkit should be included in the container, not the NVIDIA drivers
 
 ### Inference
 
@@ -677,7 +640,26 @@ To provide access to SG resources:
 * Can handle both real-time inference and batch transforms
   * Batch transform uesful for inference on the whole dataset. It can exclude attributes before running predictions. You can also join the prediction results with partial or entire input data attributes when using data that is in CSV, text, or JSON format
 
-## Graphs
+## Security
 
-* To see geographical data: heatmap
-* To spot outliers: box plot, histogram, scatter plot
+* SG supports authorization based on resource tags and identity-based policies, but not resource-based policies
+* In transit, *inter-node training communication* can be encrypted, via console or API when setting up a training/tuning job, which requires the creation of a VPC. Increases training time eand cost. Complies with regulatory requirements
+* Notebooks, training and inference containers are Internet-enabled by default, which can be a security issue. If you disable this, the VPC needs an interface endpoint (PrivateLink) or NAT Gateway and allow outbound connections. This prevents S3 access
+* Notebooks with default IAM role have automatic access to S3 buckets whose name contains "sagemaker"
+* To connect to AWS endpoint from a VPC, use VPC **interface endpoint** using PrivateLink for private connectivity
+
+---
+
+Cloudtrail
+
+* *does not monitor* calls to SG InvokeEndpoint
+* Provides a record of actions taken by an user/role/service in SG
+* Records are kept for 90 days
+* CloudWatch keeps the SG monitoring statistics for 15 months. But console limits the search to metrics that were updated in the last 2 weeks
+
+---
+
+To provide access to SG resources:
+
+* Provide access to externally authenticated users through identity federation
+* Create a role to delegate access to your resources with the 3rd party AWS account
