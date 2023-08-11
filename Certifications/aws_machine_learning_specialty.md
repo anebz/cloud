@@ -12,51 +12,51 @@
 
 - [AWS Machine Learning Specialty](#aws-machine-learning-specialty)
   - [Table of contents](#table-of-contents)
-  - [Data engineering](#data-engineering)
-    - [S3](#s3)
-    - [Glue](#glue)
-    - [Kinesis data streams](#kinesis-data-streams)
-    - [Kinesis data firehose](#kinesis-data-firehose)
-    - [Kinesis Video Stream](#kinesis-video-stream)
-    - [Data pipelines](#data-pipelines)
-    - [AWS Batch](#aws-batch)
-    - [Step functions](#step-functions)
-    - [Redshift](#redshift)
-    - [EBS](#ebs)
-  - [Feature engineering](#feature-engineering)
-  - [Sagemaker](#sagemaker)
-    - [Data input](#data-input)
-    - [SageMaker built-in algorithms](#sagemaker-built-in-algorithms)
-    - [Text algorithms](#text-algorithms)
-    - [Images algorithms](#images-algorithms)
-    - [Clustering algorithms](#clustering-algorithms)
-    - [Apache Spark \& Sagemaker](#apache-spark--sagemaker)
-    - [Sagemaker tools](#sagemaker-tools)
-  - [High-level AI services](#high-level-ai-services)
-    - [Comprehend](#comprehend)
-    - [Translate](#translate)
-    - [Transcribe](#transcribe)
-    - [Polly](#polly)
-    - [Rekognition](#rekognition)
-    - [Forecast](#forecast)
-    - [Lex](#lex)
-    - [Personalize](#personalize)
-    - [Other AI services](#other-ai-services)
-    - [SageMaker on the Edge](#sagemaker-on-the-edge)
-  - [Evaluation](#evaluation)
-  - [ML implementation and operations](#ml-implementation-and-operations)
-    - [Docker](#docker)
-    - [Inference](#inference)
-      - [Elastic inference](#elastic-inference)
-      - [Serverless inference](#serverless-inference)
-      - [Inference recommender](#inference-recommender)
-      - [Inference pipelines](#inference-pipelines)
-  - [Security](#security)
+  - [1. Data engineering](#1-data-engineering)
+    - [1.1 S3](#11-s3)
+    - [1.2 Glue](#12-glue)
+    - [1.3 Kinesis data streams](#13-kinesis-data-streams)
+    - [1.4 Kinesis data firehose](#14-kinesis-data-firehose)
+    - [1.5 Kinesis Video Stream](#15-kinesis-video-stream)
+    - [1.6 Data pipelines](#16-data-pipelines)
+    - [1.7 AWS Batch](#17-aws-batch)
+    - [1.8 Step functions](#18-step-functions)
+    - [1.9 Redshift](#19-redshift)
+    - [1.10 EBS](#110-ebs)
+  - [2. Feature engineering](#2-feature-engineering)
+  - [3. Sagemaker](#3-sagemaker)
+    - [3.1 Data input](#31-data-input)
+    - [3.2 SageMaker built-in algorithms](#32-sagemaker-built-in-algorithms)
+    - [3.3 Text algorithms](#33-text-algorithms)
+    - [3.4 Images algorithms](#34-images-algorithms)
+    - [3.5 Clustering algorithms](#35-clustering-algorithms)
+    - [3.6 Apache Spark \& Sagemaker](#36-apache-spark--sagemaker)
+    - [3.7 Sagemaker tools](#37-sagemaker-tools)
+  - [4. High-level AI services](#4-high-level-ai-services)
+    - [4.1 Comprehend](#41-comprehend)
+    - [4.2 Translate](#42-translate)
+    - [4.3 Transcribe](#43-transcribe)
+    - [4.4 Polly](#44-polly)
+    - [4.5 Rekognition](#45-rekognition)
+    - [4.6 Forecast](#46-forecast)
+    - [4.7 Lex](#47-lex)
+    - [4.8 Personalize](#48-personalize)
+    - [4.9 Other AI services](#49-other-ai-services)
+    - [4.10 SageMaker on the Edge](#410-sagemaker-on-the-edge)
+  - [5. Evaluation](#5-evaluation)
+  - [6. Machine Learning operations](#6-machine-learning-operations)
+    - [6.1 Docker](#61-docker)
+    - [6.2 Inference](#62-inference)
+      - [6.2.1 Elastic inference](#621-elastic-inference)
+      - [6.2.2 Serverless inference](#622-serverless-inference)
+      - [6.2.3 Inference recommender](#623-inference-recommender)
+      - [6.2.4 Inference pipelines](#624-inference-pipelines)
+  - [7. Security](#7-security)
 
 
-## Data engineering
+## 1. Data engineering
 
-### S3
+### 1.1 S3
 
 * S3 Analytics: gives recommendations to when to transition objects to the right storage class. Only works for Standard and Standard IA. Creates a daily report
 * Amazon FSx for Lustre: used to serve S3 training data to SageMaker, speeds up training and setup
@@ -67,7 +67,7 @@
 * Data warehouse: only store structured data
 * Data lake: structured, semi-structured and unstructured data
 
-### Glue
+### 1.2 Glue
 
 * **FindMatches** ML: de-duplicate data during ETL
 * Can detect sensitive data and redact PIIs and sensitive information, at cell and column level
@@ -75,7 +75,7 @@
 * Glue source input types: DocumentDB, Oracle, PostgreSQL -> Timestamp not accepted
 * Python Shell supports Glue jobs relying on libraries such as numpy, pandas and sklearn
 
-### Kinesis data streams
+### 1.3 Kinesis data streams
 
 * One shard can handle up to 1000 transactions/s or 1MB/s. If the file is 8kb, that means 8MB/s. So we need 8 shards
 * number_of_shards = max(incoming_write_bandwidth_in_KB/1000, outgoing_read_bandwidth_in_KB/2000)
@@ -84,14 +84,14 @@
 * Stream cannot convert files to Parquet on the fly
 * it can retain data, but minimum only for 24h
 
-### Kinesis data firehose
+### 1.4 Kinesis data firehose
 
 * Buffer interval: wait the buffer time until data comes, and then send all of it downstream. max interval: 900s
 * Can convert csv -> json, but not csv -> parquet
 * Can ingest data and transform to parquet on the fly
 * Can send data directly to Redshift with Redshift streaming ingestion
 
-### Kinesis Video Stream
+### 1.5 Kinesis Video Stream
 
 * Provides video playback
 * Data retention 1h - 10 years
@@ -105,36 +105,36 @@ Video stream allows one producer, all cameras compose one producer. Consumers ca
 
 Consumers store checkpoints and processing status in DynamoDB. Inference results can be sent to KDS.
 
-### Data pipelines
+### 1.6 Data pipelines
 
 * ETL service (runs in EC2) to manage task dependencies. For example, it can move data from RDS to S3 weekly
 * Data sources might be on-premises
 * Highly available, retries and notifications on-failure
 
-### AWS Batch
+### 1.7 AWS Batch
 
 * Serverless service to run batch jobs as Docker images
 * *Dynamic provisioning of instances (EC2 and spot)*
 * Automatically determines optimal quantity and type based on volume of jobs and requirements
 * Can schedule Batch jobs using CloudWatch events, or using Step functions
 
-### Step functions
+### 1.8 Step functions
 
 * Service to orchestrate workflows
 * Supports advanced error handling and retry mechanism outside the code
 * Supports audit of the workflow history
 * Max execution time of 1 year
 
-### Redshift
+### 1.9 Redshift
 
 * Redshift ML: to access the model with SQL commands. No need to move it to S3 and then SageMaker
 * Redshift streaming ingestion: send data directly to Redshift from Kinesis Firehose
 
-### EBS
+### 1.10 EBS
 
 Can be used for storage for SageMaker instance, but only up to 16TB and it has not so high I/O. To optimize that, store data in S3 and use Pipe mode.
 
-## Feature engineering
+## 2. Feature engineering
 
 * tf-idf: term frequency, inverse document frequency
   * Table dimensions: first axis is the amount of sentences, the other axis is the amount of *unique* unigrams + amount of unique bigrams, if that is what the analysis is based on
@@ -181,7 +181,7 @@ Graphs
 * To see geographical data: heatmap
 * To spot outliers: box plot, histogram, scatter plot
 
-## Sagemaker
+## 3. Sagemaker
 
 ![ ](img/aws_machine_learning_specialty/overview.png)
 
@@ -195,13 +195,15 @@ Instance types:
 * M4, M5: for CPU
 * P3: for GPU
 
+---
+
 * With lifecycle configuration, you can automate initial installation of libraries when creating a notebook
 * Spot instances can be used for training: it saves a lot of money but increases training time. Uses EC2, they checkpoint to S3 so training can resume in case the instance gets interrupted
 * Spot instances can be used to process anticipated traffic surges in the cheapest way when using EMR cluster. Use it for Spark task nodes only. Not for master and core nodes
 * For training instances: accelerated computing instances come with GPUs
 * Horovod: **distributed** DL framework for Tensorflow, keras, when we need several GPUs. Spark doesn't work with distributed training
 
-### Data input
+### 3.1 Data input
 
 Data input to SageMaker:
 
@@ -214,7 +216,7 @@ Data input to SageMaker:
   * you reduce the size of the EBS volumes of the training instances. to optimize, convert data into protobuf.recordIO
   * It only needs to store the final model artifacts
 
-### SageMaker built-in algorithms
+### 3.2 SageMaker built-in algorithms
 
 Built-in SG algorithms can't be edited. To use a custom architecture:
 
@@ -296,7 +298,7 @@ Required parameters before starting a SG built-in job:
   * Integrates with SG Clarify for explainability, uses Shap values, assigns each feature an importance value for a given prediction
   * Can have human guidance
 
-### Text algorithms
+### 3.3 Text algorithms
 
 * **Seq2seq**
   * Used to generate text as output
@@ -325,7 +327,7 @@ Required parameters before starting a SG built-in job:
   * Training: *single-instance CPU*
   * Observations: documents. Feature set: vocabulary. Feature: word. Output categories: topics
 
-### Images algorithms
+### 3.4 Images algorithms
 
 * **Object detection**
   * Input: recordIO or image format (jpg/png). With image format, also a JSON file for annotation data for each image
@@ -338,7 +340,7 @@ Required parameters before starting a SG built-in job:
   * jpg images accepted for inference
   * Only single-machine GPU supported for training. Inference on CPU/GPU
 
-### Clustering algorithms
+### 3.5 Clustering algorithms
 
 * **Random cut forest**
   * Algorithm to find anomalies. Used in Kinesis data analytics
@@ -350,7 +352,7 @@ Required parameters before starting a SG built-in job:
   * To find the optimal value of k: use the "elbow method" on a plot of the total within-cluster sum of squares (WSS) as a function of k
   * Can be used as dimensionality reduction
 
-### Apache Spark & Sagemaker
+### 3.6 Apache Spark & Sagemaker
 
 * Spark is used to parallelize pre-processing of big data on SG: sagemaker-spark package to integrate both, or do it separately: first pre-process in EMR, store in s3, take it from there for SG
 * Use sagemaker_pyspark and the model's SageMakerEstimator if you want to use Spark for pre-processing, but you still want it to run in SG
@@ -359,7 +361,7 @@ Required parameters before starting a SG built-in job:
 * Training df should have: feature column that's a vector of doubles, and optional labels column of Doubles. Then call fit() on SGEstimator to get a SGModel. Call transform() on SGModel to make inferences. This works with Spark Pipelines as well
   * To run the .fit() locally, provide instance_type="local" when initiating the Estimator
 
-### Sagemaker tools
+### 3.7 Sagemaker tools
 
 * SG Data Wrangler: import, transform, analyze, export data within SG Studio
   * Provides a Data Quality and Insights report that automatically verifies data quality (such as missing values, duplicate rows, and data types) and helps detect anomalies (such as outliers, class imbalance, and data leakage) in your data
@@ -388,20 +390,20 @@ Required parameters before starting a SG built-in job:
   * No-code tool to build ML models
   * Upload csv data from S3, select column to predict, build and make predictions. Can do classification and regression, it does automatic data cleaning (missing values, outliers, duplicates) and shares models and datasets with SG Studio
 
-## High-level AI services
+## 4. High-level AI services
 
-### Comprehend
+### 4.1 Comprehend
 
 * Extract key phrases, entities, sentiment, language, syntax detection, topics and document classificaction
 * Can train on own data
 * Supports custom entity recognition model to identify new entity types not supported as one of the preset generic entity types. Better solution than using regex or string matching
 
-### Translate
+### 4.2 Translate
 
 * Deep learning for translation. Automatic language detection
 * Supports custom dictionary, in CSV or TMX formatting, with their translations. Appropriate for proper names, brand names, etc.
 
-### Transcribe
+### 4.3 Transcribe
 
 * Speech to text
   * Input in FLAC, MP3, MP4 or WAV in specified language
@@ -413,7 +415,7 @@ Required parameters before starting a SG built-in job:
 * Supports vocabulary filtering, if a list of offensive words is provided
 * Can do content redaction, but only for PII info, not for censoring offensive words
 
-### Polly
+### 4.4 Polly
 
 * Text to speech
 * Supports lexicons: customize pronunciation of specific words and phrases
@@ -423,7 +425,7 @@ Required parameters before starting a SG built-in job:
   * If something is pronounced wrong, use pronunciaton lexicons
 * Speech marks: can encode when sentence/word starts and ends in the audio stream. Useful for lip-synching animation
 
-### Rekognition
+### 4.5 Rekognition
 
 * Object and scene detection, image moderation, facial analysis, face comparison, celebrity recognition
 * Text in image
@@ -437,13 +439,13 @@ Required parameters before starting a SG built-in job:
   2. Lambda triggered, create metadata for celebrities, emotions, using rekognition video and transcribe
   3. Output is sent to Opensearch
 
-### Forecast
+### 4.6 Forecast
 
 * Time series analysis
 * AutoML chooses best model for time series
 * Works with any time series. It can combine with associated data to find relationships
 
-### Lex
+### 4.7 Lex
 
 * Chatbot engine
   * Handles speech-to-text and chatbot logic. No comprehend needed
@@ -461,7 +463,7 @@ Amazon Lex Automated Chatbot Designer
 * Intents, user requests, phrases, values for slots are extracted
 * Ensures intents are well defined and separated
 
-### Personalize
+### 4.8 Personalize
 
 * Recommendation engine
 * For big batch operation: add data to S3, give schema to Personalize and then it will monitor S3 for that data
@@ -477,7 +479,7 @@ Amazon Lex Automated Chatbot Designer
 * Intelligent user segmentation, automatically classify users into groups for marketing campaigns
 * To maintain relevance, keep the dataset current: incremental data import. To do that real-time, use PutEvents API call to feed in real-time user behavior. Retrain the model, by default it updates every 2h. It should also do a full retrain (trainingMode=FULL) weekly
 
-### Other AI services
+### 4.9 Other AI services
 
 * Textract: OCR with forms, fields, tables support
   * Use Augmented AI (A2I) to get low-confidence results from Textract's AnalyzeDocument API operation reviewed by humans
@@ -497,7 +499,7 @@ Amazon Lex Automated Chatbot Designer
 * Lookout: anomaly detection from sensor data to detect equipment/metrics/vision issues
 * Monitron: industrial equiment monitoring and predictive maintenance. Provides sensors, gateways, service and app
 
-### SageMaker on the Edge
+### 4.10 SageMaker on the Edge
 
 * **Neo**
   * Machine Learning for edge devices: ARM, Intel, Nvidia, can be embedded in anything
@@ -511,7 +513,7 @@ Amazon Lex Automated Chatbot Designer
     * Inference at the edge with local data, using model trained in the cloud
     * Uses Lambda inference applications
 
-## Evaluation
+## 5. Evaluation
 
 * Confusion matrix
 * rMSE
@@ -532,7 +534,7 @@ Amazon Lex Automated Chatbot Designer
 * Precision - AUC: for imbalanced datasets, where we care more about the positive class
 * Correlation: negative correlation coefficient means the bigger the x, the lower the y
 
-## ML implementation and operations
+## 6. Machine Learning operations
 
 Steps to deploy:
 
@@ -549,7 +551,7 @@ Deployment types:
 * A/B: to test something new, it might start with 80-20, 60-40. that means automatically 20 or 40% of users get new version. in canary it goes gradually
 * Blue/Green: create two separate, but identical environments -> two endpoints. One environment (blue) is running the current application version and one environment (green) is running the new application version. Increases application availability and reduces deployment risk by simplifying the rollback process if a deployment fails. Once testing has been completed on the green environment, live application traffic is directed to the green environment and the blue environment is deprecated
 
-### Docker
+### 6.1 Docker
 
 Structure of a training container
 
@@ -598,7 +600,7 @@ Custom inference containers have following restrictions:
 
 If you plan to use GPU, make sure container is nvidia-docker compatible. Only CUDA toolkit should be included in the container, not the NVIDIA drivers
 
-### Inference
+### 6.2 Inference
 
 * Sagemaker endpoints are by default not open to the public and needs AWS credentials to access it. For open-to-the-public-endpoints, use API Gateway
 * Multi-model endpoint works for several models. They use a shared serving container which hosts several models. Improves endpoint utilization compared with using single-model endpoints, and reduces the deployment overhead. To increase availability, add SG instances of the same size and use the existing endpoint to host them
@@ -606,19 +608,19 @@ If you plan to use GPU, make sure container is nvidia-docker compatible. Only CU
 * Automatic scaling: set a scaling policy to define target metrics, min/max capacity, cooldown periods
 * To have high availability with SG endpoints, deploy multiple instances for each production endpoint and configure VPCs with at least 2 subnets, each in a different AZ
 
-#### Elastic inference
+#### 6.2.1 Elastic inference
 
 * To reduce inference latency, cheaper than using a GPU instance
 * Only works for Tensorflow, PyTorch and MXNet pre-built containers. ONNX can be used to export models to MXNet
 * Only works with custom containers built with EI-enabled Tensorflow, PyTorch or MXNet
 * Only works with image classification and object detection built-in algorithms
 
-#### Serverless inference
+#### 6.2.2 Serverless inference
 
 * Serverless endpoints. Good option for infrequent or unpredictable traffic: it will scale down to zero when there are no requests
 * Specify container, memory requirement, concurrency requirement
 
-#### Inference recommender
+#### 6.2.3 Inference recommender
 
 * Recommends best instance type and config for your model and deploys to optimal inference endpoint
 * Automates load testing, model tuning
@@ -630,7 +632,7 @@ If you plan to use GPU, make sure container is nvidia-docker compatible. Only CU
 * Instance recommendation: runs load test on recommended instance types, takes 45mins
 * Endpoint recommendation: cuustom load test, you specify instances, traffic patterns, latency requirements, throughput requirements. Takes 2h
 
-#### Inference pipelines
+#### 6.2.4 Inference pipelines
 
 * Linear sequence of 2-15 containers
 * Any combination of pre-trained built-in algorithms or your own algorithms in containers
@@ -640,7 +642,7 @@ If you plan to use GPU, make sure container is nvidia-docker compatible. Only CU
 * Can handle both real-time inference and batch transforms
   * Batch transform uesful for inference on the whole dataset. It can exclude attributes before running predictions. You can also join the prediction results with partial or entire input data attributes when using data that is in CSV, text, or JSON format
 
-## Security
+## 7. Security
 
 * SG supports authorization based on resource tags and identity-based policies, but not resource-based policies
 * In transit, *inter-node training communication* can be encrypted, via console or API when setting up a training/tuning job, which requires the creation of a VPC. Increases training time eand cost. Complies with regulatory requirements
