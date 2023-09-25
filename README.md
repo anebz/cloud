@@ -59,6 +59,10 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 
 ## Resources
 
+* ☁️ [Linux notes](Practice/linux.md)
+* ⛴ [Kubernetes personal notes](Practice/kubernetes.md)
+  * [Kubernetes API flow](Practice/k8s_api.jpg)
+* [JavaScript personal notes](Practice/javascript.md)
 * ☁️ [Basic: Learn to cloud](https://learntocloud.guide)
 * ⭐️ [AWS Architecture center](https://aws.amazon.com/architecture/)
 * ⭐️ [AWS copilot CLI: toolkit for containerized apps in ECS and AWS Fargate](https://aws.github.io/copilot-cli/)
@@ -76,9 +80,6 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 * [MLOps basics](https://github.com/graviraja/MLOps-Basics)
 * [MLOps: made with ML](https://madewithml.com/#mlops)
 * [Katacoda](https://www.katacoda.com/)
-* ⛴ [Kubernetes personal notes](Practice/kubernetes.md)
-  * [Kubernetes API flow](Practice/k8s_api.jpg)
-* [JavaScript personal notes](Practice/javascript.md)
 * ⭐️ [AWS: Lambda, copy file from S3 to EFS, code](Practice/lambda_s3_to_efs.js)
 * ⭐️ [AWS: Lambda copy file from CloudHealth to S3, personal notes](Practice/cloudhealth_lambda_s3.md)
 * ⭐️ [AWS Lambda with Docker and Serverless, personal notes](Practice/lambda_docker_serverless.md)
