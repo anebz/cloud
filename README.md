@@ -86,6 +86,7 @@ This repository contains **certification notes** 🧑‍🎓 and resources for l
 * ⭐️ [AWS Lambda Function URL](https://cloudash.dev/blog/guide-to-lambda-function-urls)
 * ⭐️ [AWS VPC guide](https://twitter.com/simonholdorf/status/1572821022381903877)
 * [AWS IAM Roles – Everything You Need to Know & Examples](https://spacelift.io/blog/aws-iam-roles)
+* [Create resources conditionally with CDK](https://loige.co/create-resources-conditionally-with-cdk/)
 
 ## Tutorials
 
