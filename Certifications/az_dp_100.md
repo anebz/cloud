@@ -105,7 +105,7 @@ To infer data types and column names from JSON:
 
 ```bash
 spark.read.option("inferSchema", "true").json(jsonFile)
-df=spark.read.format("json").option("inferSchema”,"true").load(filePath)
+df=spark.read.format("json").option("inferSchema","true").load(filePath)
 ```
 
 To move data into the memory of the local executor: `.cache()`.  cache(), persist(), cacheTable() are lazily evaluated and need to perform an action to work whereas SQL CACHE TABLE is an eager.
@@ -337,7 +337,7 @@ estimator = SKLearn(source_directory='./script',
 					entry_script='train.py')
 ```
 
-Another way: 
+Another way:
 
 ```python
 Estimator(inputs=[file_dataset.as_named_input('training_files').as_mount()])
